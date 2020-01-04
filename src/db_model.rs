@@ -214,17 +214,6 @@ fn to_tuple_pattern(types : &Vec<TypeAndName>) -> String {
 	ret
 }
 
-// pub enum SqlType {
-// 	Postgres(PsqlType)
-// }
-// impl ConvertToRust for SqlType {
-// 	fn as_rust_string(&self) -> String {
-// 		match self {
-// 			SqlType::Postgres(typ) => typ.as_rust_string()
-// 		}
-// 	}
-// }
-
 pub struct PsqlType {
 	pub oid : u32,
 	pub name : String,
@@ -237,7 +226,6 @@ pub struct PsqlType {
 }
 impl ConvertToRust for PsqlType {
 	fn as_rust_string(&self) -> String {
-		// println!("{} {} {:?}", self.oid, self.name, self.ns);
 		use PsqlTypType::*;
 		match &self.typ {
 			Enum(e) => {
@@ -256,7 +244,6 @@ impl ConvertToRust for PsqlType {
 					self.name,
 					c.to_impl()
 				)
-				//TODO - all these must implement FromRow
 			},
 			Base(b) => b.as_rust_string(),
 			Domain(d) => {
