@@ -2,8 +2,10 @@
 name = "sql_db_mapper"
 version = "0.0.1"
 authors = ["John Martin <johnmartin1225+rust@gmail.com>"]
-edition = "2018"
 license = "MIT OR Apache-2.0"
+description = "Maps a SQL database to rust structs and functions"
+repository = "https://github.com/JohnMartin95/sql_db_mapper"
+edition = "2018"
 
 [dependencies]
 postgres = {version = "0.15", features = ["with-chrono"] }
