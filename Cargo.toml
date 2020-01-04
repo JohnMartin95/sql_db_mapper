@@ -1,0 +1,19 @@
+[package]
+name = "sql_db_mapper"
+version = "0.0.1"
+authors = ["John Martin <johnmartin1225+rust@gmail.com>"]
+edition = "2018"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+postgres = {version = "0.15", features = ["with-chrono"] }
+rust_decimal = { version = "~1.0", features = ["postgres"] }
+chrono = "0.4"
+
+[lib]
+name = "sql_db_mapper"
+path = "src/lib.rs"
+
+[[bin]]
+name = "sql_db_mapper"
+path = "src/bin/main.rs"
