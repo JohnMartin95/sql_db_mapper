@@ -10,6 +10,8 @@ use sql_db_mapper::{
 
 use std::env;
 
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 fn main() {
 	let mut args : Vec<String> = env::args().collect();
 	if !(args.len() == 2 || args.len() == 3) {
@@ -26,7 +28,7 @@ fn main() {
 	let conn = Connection::connect(connection_string, TlsMode::None).unwrap();
 	std::mem::drop(args);
 
-	println!("[dependencies]\nsql_db_mapper = \"0.0.1\"\n\n");
+	println!("[dependencies]\nsql_db_mapper = \"{}\"\n\n", VERSION);
 
 	let conn = MyConnection::new(&conn);
 	let mut full_db = FullDB {schemas : Vec::new()};

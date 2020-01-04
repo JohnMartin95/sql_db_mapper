@@ -15,7 +15,7 @@ impl FullDB {
 	}
 }
 
-const FROM_ROW_TYPES : [&'static str; 11]= [
+const FROM_ROW_TYPES : [&str; 11]= [
 "bool",
 "Vec<u8>",
 "i64",
@@ -32,18 +32,23 @@ const FROM_ROW_TYPES : [&'static str; 11]= [
 impl ConvertToRust for FullDB {
 	fn as_rust_string(&self) -> String{
 		let mut ret = String::new();
-		ret += "#![allow(non_snake_case)]\n";
-		ret += "#![allow(unused_imports)]\n";
-		ret += "#![allow(non_camel_case_types)]\n";
-		ret += "\npub use sql_db_mapper::orm::orm;\n";
-		ret += "use sql_db_mapper::orm::exports::*;\n";
-		ret += "use orm::*;\n";
+		ret +=
+r#"
+#![allow(non_snake_case)]
+#![allow(unused_imports)]
+#![allow(non_camel_case_types)]
+pub use sql_db_mapper::helper_types::{
+	orm,
+	exports::*
+};
+use orm::*;
+"#;
 		// ret += "use postgres::types::{FromSql, Type, TEXT};\n";
-		ret += &format!("\ntrait FromRow {{\n\tfn from_row(row:Row) -> Self;\n}}\n\n");
+		ret += &"\ntrait FromRow {\n\tfn from_row(row:Row) -> Self;\n}\n\n".to_string();
 		for s in FROM_ROW_TYPES.iter() {
 			ret += &format!("impl FromRow for {} {{\n\tfn from_row(row:Row) -> Self {{ row.get(0) }}\n}}\n", s);
 		}
-		ret += &format!("impl FromRow for () {{\n\tfn from_row(_row:Row) -> Self {{}}\n}}\n");
+		ret += &"impl FromRow for () {\n\tfn from_row(_row:Row) -> Self {}\n}\n".to_string();
 		for schema in &self.schemas {
 			// println!("{}", schema.name);
 			ret += &schema.as_rust_string();
@@ -81,19 +86,24 @@ impl ConvertToRust for Schema {
 			ret += &typ.as_rust_string().replace("\n", "\n\t").replace("\n\t\n", "\n\n");
 		}
 		for procs_with_samne_name in &self.procs {
-			if procs_with_samne_name.len() == 1 {
+			match procs_with_samne_name.len() {
 				//no overloading
-				ret += &procs_with_samne_name[0].as_rust_string().replace("\n", "\n\t").replace("\n\t\n", "\n\n");
-			} else if procs_with_samne_name.len() > 1 {
-				ret += &overload_fn_to_rust_string(procs_with_samne_name).replace("\n", "\n\t").replace("\n\t\n", "\n\n");
+				1          => ret += &procs_with_samne_name[0].as_rust_string().replace("\n", "\n\t").replace("\n\t\n", "\n\n"),
+				x if x > 1 => ret += &overload_fn_to_rust_string(procs_with_samne_name).replace("\n", "\n\t").replace("\n\t\n", "\n\n"),
+				//ignore case where Vec is empty
+				_ => (),
 			}
-			//ignore case where Vec is empty
+			// if procs_with_samne_name.len() == 1 {
+			// 	ret += &procs_with_samne_name[0].as_rust_string().replace("\n", "\n\t").replace("\n\t\n", "\n\n");
+			// } else if procs_with_samne_name.len() > 1 {
+			// 	ret += &overload_fn_to_rust_string(procs_with_samne_name).replace("\n", "\n\t").replace("\n\t\n", "\n\n");
+			// }
 		}
-		ret += &format!("\n}}\n");
+		ret += &"\n}\n".to_string();
 		ret
 	}
 }
-fn overload_fn_to_rust_string(procs : &Vec<SqlProc>) -> String {
+fn overload_fn_to_rust_string(procs : &[SqlProc]) -> String {
 	format!(
 r#"/// This is an overloaded SQL function, it takes one tuple parameter.
 ///
@@ -116,7 +126,7 @@ mod {0} {{
 	)
 }
 
-fn to_overload_doc(procs : &Vec<SqlProc>) -> String {
+fn to_overload_doc(procs : &[SqlProc]) -> String {
 	let mut ret = String::new();
 	for proc in procs {
 		ret += &format!(
@@ -129,7 +139,7 @@ fn to_overload_doc(procs : &Vec<SqlProc>) -> String {
 	ret
 }
 
-fn to_trait_impls(procs : &Vec<SqlProc>) -> String {
+fn to_trait_impls(procs : &[SqlProc]) -> String {
 	procs.iter().enumerate().map(|(i,p)| to_trait_impl(i,p)).collect()
 }
 
@@ -176,7 +186,7 @@ impl OverloadTrait for {} {{
 			.prepare_cached({})?
 			.query(&[{}])?
 			.into_iter()
-			.map(|v| {}::from_row(v))
+			.map({}::from_row)
 			.{}()
 		)
 	}}
@@ -194,7 +204,7 @@ impl OverloadTrait for {} {{
 
 	ret
 }
-fn to_tuple_type(types : &Vec<TypeAndName>) -> String {
+fn to_tuple_type(types : &[TypeAndName]) -> String {
 	let mut ret = String::from("(&Connection, ");
 	for tan in types {
 		ret += "&";
@@ -204,7 +214,7 @@ fn to_tuple_type(types : &Vec<TypeAndName>) -> String {
 	ret += ")";
 	ret
 }
-fn to_tuple_pattern(types : &Vec<TypeAndName>) -> String {
+fn to_tuple_pattern(types : &[TypeAndName]) -> String {
 	let mut ret = String::from("(conn, ");
 	for tan in types {
 		ret += &tan.name;
@@ -466,7 +476,7 @@ r"pub fn {}(
 		.prepare_cached({})?
 		.query(&[{}])?
 		.into_iter()
-		.map(|v| {}::from_row(v))
+		.map({}::from_row)
 		.{}()
 	)
 }}

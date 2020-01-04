@@ -4,4 +4,4 @@ pub mod connection;
 
 pub mod db_model;
 
-pub mod orm;
+pub mod helper_types;

@@ -1,7 +1,7 @@
 //! Helper types and functions for auto-generateed psql database wrappers
 
 
-/// Contains and reexports types that callers of the wrapped db would find need to use it
+/// Contains and reexports types that callers of the wrapped db would need to use it
 pub mod orm {
 	pub use postgres::{Connection, TlsMode};
 	pub use rust_decimal::{

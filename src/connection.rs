@@ -103,7 +103,7 @@ JOIN pg_namespace AS ns
 	ON ns.oid = t.typnamespace
 WHERE t.oid = $1";
 
-const RUST_KEYWORDS : [&'static str;58]= [
+const RUST_KEYWORDS : [&str; 58]= [
 	"as",
 	"use",
 	"extern crate",
@@ -171,7 +171,7 @@ pub struct MyConnection<'a> {
 impl<'a> MyConnection<'a> {
 	pub fn new(conn:&'a Connection) -> MyConnection<'a> {
 		MyConnection {
-			conn : conn
+			conn
 		}
 	}
 
@@ -212,12 +212,18 @@ impl<'a> MyConnection<'a> {
 				let arg_modes : Option<Vec<i8>> = v.get(10);
 
 				let(all_arg_types, arg_modes): (Vec<u32>, Vec<i8>) =
-					if all_arg_types.is_none() || arg_modes.is_none() {
+					if let Some(all_arg_types) = all_arg_types {
+						if let Some(arg_modes) = arg_modes {
+							(all_arg_types, arg_modes)
+						} else {
+							let inputs : Vec<u32> = v.get(8);
+							let len = inputs.len();
+							(inputs, vec![b'i' as i8; len])
+						}
+					} else {
 						let inputs : Vec<u32> = v.get(8);
 						let len = inputs.len();
 						(inputs, vec![b'i' as i8; len])
-					} else {
-						(all_arg_types.unwrap(), arg_modes.unwrap())
 					};
 				let arg_names : Option<Vec<String>> = v.get(11);
 				let arg_names = match arg_names {
@@ -226,7 +232,7 @@ impl<'a> MyConnection<'a> {
 				};
 				let (inputs, outputs) = self.get_proc_output_type(&all_arg_types, &arg_modes, arg_names);
 
-				let outputs = if outputs.len() == 0 {
+				let outputs = if outputs.is_empty() {
 					let ret_type_id : u32 = v.get(6);
 					let mut type_name : Vec<_> = self.conn
 						.prepare_cached(GET_TYPE_NAME)
@@ -254,14 +260,14 @@ impl<'a> MyConnection<'a> {
 					name : v.get(3),
 					returns_set : v.get(4),
 					num_args : v.get(5),
-					inputs : inputs,
-					outputs : outputs
+					inputs,
+					outputs,
 				}
 			}).collect()
 		}).collect()
 	}
 
-	fn get_proc_output_type(&self, all_arg_types : &Vec<u32>, arg_modes: &Vec<i8>, arg_names : Vec<String>) -> (Vec<TypeAndName>, Vec<TypeAndName>) {
+	fn get_proc_output_type(&self, all_arg_types : &[u32], arg_modes: &[i8], arg_names : Vec<String>) -> (Vec<TypeAndName>, Vec<TypeAndName>) {
 		assert_eq!(all_arg_types.len(), arg_modes.len());
 		let arg_names =
 			if all_arg_types.len() != arg_names.len() {
@@ -274,7 +280,7 @@ impl<'a> MyConnection<'a> {
 				arg_names
 			};
 		let arg_names : Vec<_> = arg_names.into_iter().enumerate().map(|(i,v)| {
-			if v.len()==0 || RUST_KEYWORDS.iter().any(|&keyword| keyword==&v) {
+			if v.is_empty() || RUST_KEYWORDS.iter().any(|&keyword| keyword==v) {
 				format!("input_{}", i)
 			} else {
 				v
