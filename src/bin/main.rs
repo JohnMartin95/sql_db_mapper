@@ -4,9 +4,16 @@ use std::{
 	io::Write
 };
 use sql_db_mapper::{
+	format_rust,
 	connection::*,
 	db_model::*,
 };
+
+#[cfg(feature = "use_ast")]
+use quote::ToTokens;
+
+#[cfg(feature = "use_ast")]
+use sql_db_mapper::ast_convert::*;
 
 use std::env;
 
@@ -50,18 +57,26 @@ fn main() {
 		full_db.add_schema(schema);
 	}
 
-	let s = full_db.as_rust_string();
+	#[cfg(feature = "use_ast")]
+	let code_string = full_db.to_rust_ast().to_token_stream().to_string();
+	#[cfg(not(feature = "use_ast"))]
+	let code_string = full_db.as_rust_string();
+
+
+	let final_str = format_rust(&code_string);
+
+
 	if let Some(output_file) = output_file {
 		let f = File::create(output_file);
 		match f {
-			Ok(mut f) => f.write_all(s.as_bytes()).expect("failed to write to file"),
+			Ok(mut f) => f.write_all(final_str.as_bytes()).expect("failed to write to file"),
 			Err(e) => {
 				eprintln!("Error ({}) while opening output file. Writing output to stdout just in case", e);
-				println!("{}", s);
+				println!("{}", final_str);
 			}
 		}
 	} else {
-		println!("{}", s);
+		println!("{}", final_str);
 	}
 }
 //

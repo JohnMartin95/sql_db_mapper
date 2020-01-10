@@ -1,4 +1,4 @@
-pub type SchemaId = u32;
+pub use super::sql_tree::*;
 
 pub trait ConvertToRust {
 	fn as_rust_string(&self) -> String {
@@ -6,9 +6,6 @@ pub trait ConvertToRust {
 	}
 }
 
-pub struct FullDB {
-	pub schemas : Vec<Schema>,
-}
 impl FullDB {
 	pub fn add_schema(&mut self, schema : Schema) {
 		self.schemas.push(schema);
@@ -33,22 +30,18 @@ impl ConvertToRust for FullDB {
 	fn as_rust_string(&self) -> String{
 		let mut ret = String::new();
 		ret +=
-r#"
-#![allow(non_snake_case)]
+r#"#![allow(non_snake_case)]
 #![allow(unused_imports)]
 #![allow(non_camel_case_types)]
-pub use sql_db_mapper::helper_types::{
-	orm,
-	exports::*
-};
+pub use sql_db_mapper::helper_types::{ orm, exports::* };
 use orm::*;
 "#;
 		// ret += "use postgres::types::{FromSql, Type, TEXT};\n";
-		ret += &"\ntrait FromRow {\n\tfn from_row(row:Row) -> Self;\n}\n\n".to_string();
+		ret += &"trait FromRow { fn from_row(row:Row) -> Self; }\n".to_string();
+		ret += &"impl FromRow for () { fn from_row(_row:Row) -> Self {} }\n".to_string();
 		for s in FROM_ROW_TYPES.iter() {
-			ret += &format!("impl FromRow for {} {{\n\tfn from_row(row:Row) -> Self {{ row.get(0) }}\n}}\n", s);
+			ret += &format!("impl FromRow for {} {{ fn from_row(row:Row) -> Self {{ row.get(0) }} }}\n", s);
 		}
-		ret += &"impl FromRow for () {\n\tfn from_row(_row:Row) -> Self {}\n}\n".to_string();
 		for schema in &self.schemas {
 			// println!("{}", schema.name);
 			ret += &schema.as_rust_string();
@@ -58,15 +51,6 @@ use orm::*;
 	}
 }
 
-type TypeId = u32;
-
-pub struct Schema {
-	pub id : SchemaId,
-	pub name : String,
-	pub owner_name : String,
-	pub types : Vec<PsqlType>,
-	pub procs : Vec<Vec<SqlProc>>,
-}
 impl Schema {
 	pub fn add_type(&mut self, typ : PsqlType) {
 		self.types.push(typ);
@@ -158,7 +142,7 @@ fn to_trait_impl(index : usize, proc : &SqlProc) -> String {
 	//if proc returns table create type for that proc
 	if let ProcOutput::NewType(tans) = &proc.outputs {
 		ret += &format!("#[derive(Debug, Clone)]\npub struct {}{}Return {{{}\n}}\n", proc.name, index, tans.as_rust_string());
-		ret += &format!("impl FromRow for {}Return {{\n\tfn from_row(row:Row) -> Self {{\n\t\t{}Return {{{}\n\t\t}}\n\t}}\n}}\n", proc.name, proc.name, tans.to_impl());
+		ret += &format!("impl FromRow for {}Return {{\n\tfn from_row(row:Row) -> Self {{\n\t\tSelf {{{}\n\t\t}}\n\t}}\n}}\n", proc.name, tans.to_impl());
 	}
 	//get the output type name
 	let ret_type_name = match &proc.outputs {
@@ -224,16 +208,6 @@ fn to_tuple_pattern(types : &[TypeAndName]) -> String {
 	ret
 }
 
-pub struct PsqlType {
-	pub oid : u32,
-	pub name : String,
-	pub ns : SchemaId,
-	pub len : i16,
-	pub by_val : bool,
-	pub typ : PsqlTypType,
-	pub relid : u32,
-	pub align : i8
-}
 impl ConvertToRust for PsqlType {
 	fn as_rust_string(&self) -> String {
 		use PsqlTypType::*;
@@ -247,10 +221,9 @@ impl ConvertToRust for PsqlType {
 				&e.to_impl(&self.name, self.oid)
 			},
 			Composite(c) => {
-				format!("\n#[derive(Debug, Clone)]\npub struct {} {{{}\n}}\nimpl FromRow for {} {{\n\tfn from_row(row:Row) -> Self {{\n\t\t{} {{{}\n\t\t}}\n\t}}\n}}\n",
+				format!("\n#[derive(Debug, Clone)]\npub struct {} {{{}\n}}\nimpl FromRow for {} {{\n\tfn from_row(row:Row) -> Self {{\n\t\tSelf {{{}\n\t\t}}\n\t}}\n}}\n",
 					self.name,
 					c.as_rust_string(),
-					self.name,
 					self.name,
 					c.to_impl()
 				)
@@ -275,16 +248,7 @@ impl ConvertToRust for PsqlType {
 		}
 	}
 }
-pub enum PsqlTypType {
-	Enum(PsqlEnumType),
-	Composite(PsqlCompositeType),
-	Base(PsqlBaseType),
-	Domain(PsqlDomain),
-	Other
-}
-pub struct PsqlEnumType {
-	pub labels : Vec<String>
-}
+
 impl ConvertToRust for PsqlEnumType {
 	fn as_rust_string(&self) -> String {
 		self.labels
@@ -333,9 +297,6 @@ impl ToSql for {} {{
 	}
 }
 
-pub struct PsqlCompositeType {
-	pub cols : Vec<Column>
-}
 impl ConvertToRust for PsqlCompositeType {
 	fn as_rust_string(&self) -> String {
 		self.cols
@@ -357,10 +318,6 @@ impl ToImpl for PsqlCompositeType {
 	}
 }
 
-pub struct PsqlBaseType {
-	pub oid : u32,
-	pub name : String
-}
 impl ConvertToRust for PsqlBaseType {
 	fn as_rust_string(&self) -> String {
 		format!("\npub type {} = {};", self.name, {
@@ -383,49 +340,18 @@ impl ConvertToRust for PsqlBaseType {
 	}
 }
 
-pub struct PsqlDomain {
-	pub base_oid : u32,
-	pub base_name : String,
-	pub base_ns_name : String
-}
 impl ConvertToRust for PsqlDomain {
 	fn as_rust_string(&self) -> String {
 		format!("{}::{}", self.base_ns_name, self.base_name)
 	}
 }
 
-pub struct Column {
-	pub pos : i16,
-	pub name : String,
-	pub type_id : TypeId,
-	pub type_name : String,
-	pub type_ns_name : String,
-	pub not_null : bool
-}
 impl ConvertToRust for Column {
 	fn as_rust_string(&self) -> String {
 		format!("pub {} : crate::{}::{}", self.name, self.type_ns_name, self.type_name)
 	}
 }
 
-pub struct SqlProc {
-	pub ns : u32,
-	pub ns_name : String,
-	pub oid : u32,
-	pub name : String,
-	pub returns_set : bool,
-	pub num_args : i16,
-	pub inputs : Vec<TypeAndName>,
-	pub outputs: ProcOutput,
-}
-pub struct TypeAndName {
-	pub typ : String,
-	pub name : String
-}
-pub enum ProcOutput {
-	Existing(String),
-	NewType(Vec<TypeAndName>)
-}
 impl SqlProc {
 	fn get_ret_type(&self) -> (String, String) {
 		//get the output type name
@@ -459,7 +385,7 @@ impl ConvertToRust for SqlProc {
 		//if proc returns table create type for that proc
 		if let ProcOutput::NewType(tans) = &self.outputs {
 			ret += &format!("#[derive(Debug, Clone)]\npub struct {}Return {{{}\n}}\n", self.name, tans.as_rust_string());
-			ret += &format!("impl FromRow for {}Return {{\n\tfn from_row(row:Row) -> Self {{\n\t\t{}Return {{{}\n\t\t}}\n\t}}\n}}\n", self.name, self.name, tans.to_impl());
+			ret += &format!("impl FromRow for {}Return {{\n\tfn from_row(row:Row) -> Self {{\n\t\tSelf {{{}\n\t\t}}\n\t}}\n}}\n", self.name, tans.to_impl());
 		}
 		//get the output type name
 		let (ret_type_name, new_ret_type_name) = self.get_ret_type();
