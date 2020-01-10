@@ -4,8 +4,6 @@ pub mod connection;
 
 pub mod db_model;
 
-pub mod helper_types;
-
 mod sql_tree;
 
 #[cfg(feature = "use_ast")]

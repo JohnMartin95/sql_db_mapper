@@ -1,5 +1,6 @@
 [workspace]
 members = [
 	"sql_db_mapper_derive",
-	"sql_db_mapper"
+	"sql_db_mapper",
+	"sql_db_mapper_core",
 ]
