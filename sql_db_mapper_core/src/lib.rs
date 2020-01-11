@@ -5,6 +5,7 @@
 
 pub use tokio_postgres::{
 	Client,
+	Statement,
 	NoTls,
 	Error as SqlError,
 	row::Row,
@@ -17,6 +18,7 @@ pub use postgres_types::{
 	Type,
 };
 pub use std::error::Error;
+pub use std::future::Future;
 pub use rust_decimal::{
 	Decimal,
 	prelude::ToPrimitive
@@ -41,10 +43,18 @@ impl<'a> FromSql<'a> for Interval {
 		ty.oid() == 1186
 	}
 }
+impl ToSql for Interval {
+	fn to_sql(&self, _ty: &Type, mut out: &mut bytes::BytesMut) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
+		let i = self.dur.num_milliseconds();
+		i.to_sql(&Type::INT4, &mut out)
+	}
+	fn accepts(ty: &Type) -> bool {
+		ty.oid() == 1186
+	}
 
-pub mod exports {
-	pub use super::TryFromRow;
+	to_sql_checked!();
 }
+
 
 #[derive(Debug, Clone)]
 pub struct EnumParseError {
@@ -63,8 +73,6 @@ impl std::fmt::Display for EnumParseError {
 	}
 }
 
-//TODO forgot that these 'need' impls to make implementaion of function wrappers easier
-// consider switching back to FromRow-like trait or looking at other solutions
 
 impl TryFromRow for () {
 	fn from_row(_row: Row) -> Result<Self, SqlError> {

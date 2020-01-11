@@ -20,7 +20,7 @@ pub fn format_rust(value: &str) -> String {
 	};
 	if let Ok(mut proc) = Command::new("rustfmt").arg("--emit=stdout")
 		.arg("--edition=2018")
-		.args(&["--config", "blank_lines_lower_bound=1,fn_single_line=true,hard_tabs=true,imports_layout=Vertical"])
+		.args(&["--config", "fn_single_line=true,hard_tabs=true,imports_layout=Vertical"])
 		.stdin(Stdio::piped())
 		.stdout(Stdio::piped())
 		.stderr(Stdio::piped())

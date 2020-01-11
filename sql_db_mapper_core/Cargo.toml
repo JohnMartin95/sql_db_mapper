@@ -15,3 +15,5 @@ tokio-postgres = { version = "0.5.1", features = ["with-chrono-0_4"] }
 postgres-types = { version = "0.1.0", features = ["derive"] }
 rust_decimal = { version = "1.1", features = ["postgres"] }
 chrono = "0.4"
+bytes = "0.5"
+parking_lot = "0.10"

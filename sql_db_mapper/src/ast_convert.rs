@@ -58,6 +58,7 @@ impl ConvertToAst for FullDB {
 			items: vec![
 				parse_quote!{ pub use sql_db_mapper_core as orm; },
 				parse_quote!{ use orm::*; },
+				parse_quote!{ use sql_db_mapper_derive::TryFromRow; },
 			].extend2(
 				self.schemas.iter().map(ConvertToAst::to_rust_ast).map(Item::Mod)
 			),
@@ -216,7 +217,7 @@ impl ConvertToAst for Vec<SqlProc> {
 				fn_docs.extend(doc_comments);
 
 				let mut fn_code : ItemFn = parse_quote!{
-					pub fn #name_type<T:#name_type::OverloadTrait>(input : T) -> T::Output {
+					pub fn #name_type<T:'static + #name_type::OverloadTrait>(input : T) -> impl Future<Output = T::Output> {
 						<T as #name_type::OverloadTrait>::tmp(input)
 					}
 				};
@@ -224,10 +225,12 @@ impl ConvertToAst for Vec<SqlProc> {
 
 				let mod_with_impls : ItemMod = parse_quote!{
 					mod #name_type {
+						use async_trait::async_trait;
 						use super::*;
+						#[async_trait]
 						pub trait OverloadTrait {
 							type Output;
-							fn tmp(self) -> Self::Output;
+							async fn tmp(self) -> Self::Output;
 						}
 						#trait_impls
 					}
@@ -249,9 +252,9 @@ fn to_trait_impl(index : usize, proc : &SqlProc) -> TokenStream {
 		.iter().map(|v| v.to_token_stream()).collect()
 }
 fn to_tuple_type(types : &[TypeAndName]) -> Type {
-	let mut ret = String::from("(&Connection, ");
+	let mut ret = String::from("(&'a Client, ");
 	for tan in types {
-		ret += "&";
+		ret += "&'a ";
 		ret += &tan.typ;
 		ret += ", ";
 	}
@@ -259,7 +262,7 @@ fn to_tuple_type(types : &[TypeAndName]) -> Type {
 	syn::parse_str(&ret).unwrap()
 }
 fn to_tuple_pattern(types : &[TypeAndName]) -> TokenStream {
-	let mut ret = String::from("(conn, ");
+	let mut ret = String::from("(client, ");
 	for tan in types {
 		ret += &tan.name;
 		ret += ", ";
@@ -282,7 +285,7 @@ fn to_overload_doc(procs : &[SqlProc]) -> Vec<Attribute> {
 			} else {
 				format!("Option<{}>", ret_type_name)
 			};
-		let doc_comment = format!("{}(( conn : &Connection, {} )) -> {}", name, func_parms, new_ret_type_name);
+		let doc_comment = format!("{}(( client : &Client, {} )) -> {}", name, func_parms, new_ret_type_name);
 		let ret = parse_quote!{
 			#[doc = #doc_comment]
 		};
@@ -337,6 +340,7 @@ fn as_rust_helper(proc : &SqlProc, name : &str, is_overide : bool) -> Vec<Item> 
 		ProcOutput::NewType(_) => format!("{}Return", name)
 	};
 	let ret_type_name : Type = syn::parse_str(&ret_type_name).unwrap();
+	//get the return type properly wrapped in a Vec or Option
 	let new_ret_type_name : Type=
 		if proc.returns_set {
 			parse_quote!{ Vec<#ret_type_name> }
@@ -346,44 +350,49 @@ fn as_rust_helper(proc : &SqlProc, name : &str, is_overide : bool) -> Vec<Item> 
 
 	let func_params : TokenStream = proc.inputs.as_function_params();
 	let query_params : TokenStream = as_query_params(&proc.inputs);
-	let final_call = if proc.returns_set { "collect" } else { "next" };
-	let final_call : Ident = syn::parse_str(final_call).unwrap();
+	//the body of the function
+	let async_body : TokenStream = if proc.returns_set {
+		parse_quote!{
+			let stmt = client.prepare(#call_string_name).await?;
+			client
+				.query(&stmt, &[#query_params]).await?
+				.into_iter()
+				.map(#ret_type_name::from_row)
+				.collect()
+		}
+	} else {
+		parse_quote!{
+			let stmt = client.prepare(#call_string_name).await?;
+			Ok(client
+				.query_opt(&stmt, &[#query_params]).await?
+				.map(#ret_type_name::from_row)
+				.transpose()?
+			)
+		}
+	};
+	//the wrappings on the body
 	let func_text : Item =
 	if is_overide {
 		let tuple_type : Type = to_tuple_type(&proc.inputs);
 		let tuple_pattern : TokenStream = to_tuple_pattern(&proc.inputs);
 		parse_quote!{
-			impl OverloadTrait for #tuple_type {
-				type Output = SqlResult<#new_ret_type_name>;
-				fn tmp(self) -> Self::Output {
+			#[async_trait]
+			impl<'a> OverloadTrait for #tuple_type {
+				type Output = Result<#new_ret_type_name, SqlError>;
+				async fn tmp(self) -> Self::Output {
 					let #tuple_pattern = self;
-					Ok(
-						conn
-						.prepare_cached(#call_string_name)?
-						.query(&[#query_params])?
-						.into_iter()
-						.map(#ret_type_name::from_row)
-						.#final_call()
-					)
+					#async_body
 				}
 			}
 		}
 	} else {
 		parse_quote!{
-			pub fn #name_type(
-				conn : &Connection,
+			pub async fn #name_type(
+				client : &Client,
 				#func_params
-			) -> SqlResult<#new_ret_type_name> {
-				Ok(
-					conn
-					.prepare_cached(#call_string_name)?
-					.query(&[#query_params])?
-					.into_iter()
-					.map(#ret_type_name::from_row)
-					.#final_call()
-				)
+			) -> Result<#new_ret_type_name, SqlError> {
+				#async_body
 			}
-
 		}
 	};
 

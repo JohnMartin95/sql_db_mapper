@@ -43,7 +43,7 @@ pub fn try_from_tokio_postgres_row(input: proc_macro::TokenStream) -> proc_macro
 				.map(|(i,v)| {
 					quote!{ #v : row.try_get(#i)?, }
 				}).collect();
-			quote!{ Self { #tmp } }
+			quote!{ Ok(Self { #tmp }) }
 		},
 		syn::Fields::Unnamed(_) => {
 			let tmp : TokenStream = fields
@@ -52,7 +52,7 @@ pub fn try_from_tokio_postgres_row(input: proc_macro::TokenStream) -> proc_macro
 				.map(|(i,_v)| {
 					quote!{ row.try_get(#i)?, }
 				}).collect();
-			quote!{ Self ( #tmp ) }
+			quote!{ Ok(Self ( #tmp )) }
 		},
 		syn::Fields::Unit => {
 			return quote! {
