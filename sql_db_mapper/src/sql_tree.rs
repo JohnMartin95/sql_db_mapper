@@ -4,6 +4,12 @@ pub struct FullDB {
 	pub schemas : Vec<Schema>,
 }
 
+impl FullDB {
+	pub fn add_schema(&mut self, schema : Schema) {
+		self.schemas.push(schema);
+	}
+}
+
 #[derive(Debug, Clone)]
 pub struct Schema {
 	pub id : SchemaId,
@@ -11,6 +17,14 @@ pub struct Schema {
 	pub owner_name : String,
 	pub types : Vec<PsqlType>,
 	pub procs : Vec<Vec<SqlProc>>,
+}
+impl Schema {
+	pub fn add_type(&mut self, typ : PsqlType) {
+		self.types.push(typ);
+	}
+	pub fn append(&mut self, mut all_procs : Vec<Vec<SqlProc>>) {
+		self.procs.append(&mut all_procs);
+	}
 }
 
 pub type SchemaId = u32;

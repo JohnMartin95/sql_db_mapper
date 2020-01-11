@@ -8,13 +8,13 @@ pub use tokio_postgres::{
 	NoTls,
 	Error as SqlError,
 	row::Row,
-	types::{
-		to_sql_checked,
-		FromSql,
-		ToSql,
-		IsNull,
-		Type,
-	},
+};
+pub use postgres_types::{
+	to_sql_checked,
+	FromSql,
+	ToSql,
+	IsNull,
+	Type,
 };
 pub use std::error::Error;
 pub use rust_decimal::{
@@ -22,6 +22,10 @@ pub use rust_decimal::{
 	prelude::ToPrimitive
 };
 pub use chrono::{NaiveDateTime, NaiveDate, NaiveTime, DateTime, Utc, Duration};
+
+pub trait TryFromRow: Sized {
+	fn from_row(row : Row) -> Result<Self, SqlError>;
+}
 
 
 #[derive(Debug, Clone)]
@@ -38,6 +42,9 @@ impl<'a> FromSql<'a> for Interval {
 	}
 }
 
+pub mod exports {
+	pub use super::TryFromRow;
+}
 
 #[derive(Debug, Clone)]
 pub struct EnumParseError {
@@ -53,5 +60,69 @@ impl Error for EnumParseError {}
 impl std::fmt::Display for EnumParseError {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
 		write!(f,"Invalid Enum Variant '{}' for type '{}'", self.variant, self.typ)
+	}
+}
+
+//TODO forgot that these 'need' impls to make implementaion of function wrappers easier
+// consider switching back to FromRow-like trait or looking at other solutions
+
+impl TryFromRow for () {
+	fn from_row(_row: Row) -> Result<Self, SqlError> {
+		Ok(())
+	}
+}
+impl TryFromRow for bool {
+	fn from_row(row: Row) -> Result<Self, SqlError> {
+		row.try_get(0)
+	}
+}
+impl TryFromRow for Vec<u8> {
+	fn from_row(row: Row) -> Result<Self, SqlError> {
+		row.try_get(0)
+	}
+}
+impl TryFromRow for i64 {
+	fn from_row(row: Row) -> Result<Self, SqlError> {
+		row.try_get(0)
+	}
+}
+impl TryFromRow for i32 {
+	fn from_row(row: Row) -> Result<Self, SqlError> {
+		row.try_get(0)
+	}
+}
+impl TryFromRow for u32 {
+	fn from_row(row: Row) -> Result<Self, SqlError> {
+		row.try_get(0)
+	}
+}
+impl TryFromRow for String {
+	fn from_row(row: Row) -> Result<Self, SqlError> {
+		row.try_get(0)
+	}
+}
+impl TryFromRow for NaiveDate {
+	fn from_row(row: Row) -> Result<Self, SqlError> {
+		row.try_get(0)
+	}
+}
+impl TryFromRow for NaiveDateTime {
+	fn from_row(row: Row) -> Result<Self, SqlError> {
+		row.try_get(0)
+	}
+}
+impl TryFromRow for DateTime<Utc> {
+	fn from_row(row: Row) -> Result<Self, SqlError> {
+		row.try_get(0)
+	}
+}
+impl TryFromRow for Interval {
+	fn from_row(row: Row) -> Result<Self, SqlError> {
+		row.try_get(0)
+	}
+}
+impl TryFromRow for Decimal {
+	fn from_row(row: Row) -> Result<Self, SqlError> {
+		row.try_get(0)
 	}
 }

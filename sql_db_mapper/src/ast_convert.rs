@@ -30,20 +30,6 @@ pub trait ConvertToAst {
 	}
 }
 
-const FROM_ROW_TYPES : [&str; 11]= [
-"bool",
-"Vec<u8>",
-"i64",
-"i32",
-"u32",
-"String",
-"NaiveDate",
-"NaiveDateTime",
-"DateTime<Utc>",
-"Interval",
-"Decimal"
-];
-
 impl ConvertToAst for FullDB {
 	type Output = File;
 	/** Output structure
@@ -58,34 +44,21 @@ impl ConvertToAst for FullDB {
 	};
 	use orm::*;
 
-	trait FromRow {
-		fn from_row(row:Row) -> Self;
-	}
-	// FromRow implementations for primitive/standard types
 
 	//code for each schema here
 	``` */
 	fn to_rust_ast(&self) -> Self::Output {
 		File {
 			shebang: None,
-
 			attrs: vec![
 				parse_quote!{ #![allow(non_snake_case)] },
 				parse_quote!{ #![allow(unused_imports)] },
 				parse_quote!{ #![allow(non_camel_case_types)] },
 			],
-
 			items: vec![
-				parse_quote!{ pub use sql_db_mapper::helper_types::{ orm, exports::*, }; },
+				parse_quote!{ pub use sql_db_mapper_core as orm; },
 				parse_quote!{ use orm::*; },
-				parse_quote!{ trait FromRow { fn from_row(row:Row) -> Self; } },
-				parse_quote!{ impl FromRow for () { fn from_row(_row:Row) -> Self {} } },
 			].extend2(
-				FROM_ROW_TYPES.iter().map(|&v : &&str| {
-					let v : Type = syn::parse_str(v).unwrap();
-					parse_quote!{ impl FromRow for #v { fn from_row(row:Row) -> Self { row.get(0) } } }
-				})
-			).extend2(
 				self.schemas.iter().map(ConvertToAst::to_rust_ast).map(Item::Mod)
 			),
 		}
@@ -125,31 +98,32 @@ impl ConvertToAst for Schema {
 }
 
 impl ConvertToAst for PsqlType {
-	type Output = Vec<Item>;
+	type Output = Option<Item>;
 
 	fn to_rust_ast(&self) -> Self::Output {
 		use PsqlTypType::*;
-		match &self.typ {
-			Enum(e) => enum_to_ast_helper(e, &self.name, self.oid),
-			Composite(c) => composite_to_ast_helper(c, &self.name),
-			Base(b) => base_to_ast_helper(b),
-			Domain(d) => domain_to_ast_helper(d, &self.name),
-			Other => {
-				let name_type : Type  = syn::parse_str(&self.name).unwrap();
-				if self.oid == 2278 {
-					vec![ parse_quote!{ pub type #name_type = (); } ]
-				} else {
-					// println!("	Couldn't convert type: {}, {}", self.name, self.oid);
-					Vec::new()
+		Some(
+			match &self.typ {
+				Enum(e) => enum_to_ast_helper(e, &self.name),
+				Composite(c) => composite_to_ast_helper(c, &self.name),
+				Base(b) => return base_to_ast_helper(b),
+				Domain(d) => domain_to_ast_helper(d, &self.name),
+				Other => {
+					let name_type : Type  = syn::parse_str(&self.name).unwrap();
+					if self.oid == 2278 {
+						parse_quote!{ pub type #name_type = (); }
+					} else {
+						// println!("	Couldn't convert type: {}, {}", self.name, self.oid);
+						return None;
+					}
 				}
 			}
-		}
+		)
 	}
 }
-fn enum_to_ast_helper(e : &PsqlEnumType, name : &str, oid : u32) ->  Vec<Item> {
+
+fn enum_to_ast_helper(e : &PsqlEnumType, name : &str) ->  Item {
 	let name_type : Type  = syn::parse_str(name).unwrap();
-	let name_str = LitStr::new(name, Span::call_site());
-	let oid : LitInt = LitInt::new(&oid.to_string(), Span::call_site());
 
 	//the enum definition itself
 	let enum_body : TokenStream = e.labels
@@ -160,70 +134,17 @@ fn enum_to_ast_helper(e : &PsqlEnumType, name : &str, oid : u32) ->  Vec<Item> {
 		}).collect::<Vec<punctuated::Punctuated<Variant, token::Comma>>>()
 		.into_iter()
 		.map(|v| v.to_token_stream()).collect();
-	let derive_thing : Attribute = parse_quote!{ #[derive(Debug, Clone)] };
+	let derive_thing : Attribute = parse_quote!{ #[derive(Debug, Clone, TryFromRow, ToSql, FromSql)] };
 	let mut full_enum : ItemEnum = parse_quote!{ pub enum #name_type { #enum_body } };
 	full_enum.attrs.push(derive_thing);
 
-	// match armns in the To and FromSql impls
-	let (match_arms, to_match_arms): (Vec<Arm>, Vec<Arm>) = e
-		.labels
-		.iter()
-		.map(|v| {
-			let v_ident : Type  = syn::parse_str(&v).unwrap();
-			let v_str = LitStr::new(&v, Span::call_site());
-			let v_bytes = LitByteStr::new(v.as_bytes(), Span::call_site());
-			(
-				parse_quote!{ #v_str => Ok(Self::#v_ident), },
-				parse_quote!{ Self::#v_ident => #v_bytes, },
-			)
-		}).unzip();
-	let match_arms : TokenStream    = match_arms   .into_iter().map(|v| v.to_token_stream()).collect();
-	let to_match_arms : TokenStream = to_match_arms.into_iter().map(|v| v.to_token_stream()).collect();
-
-	// impl of FromSql for the enum
-	let from_sql_impl : Item = parse_quote!{
-		impl FromSql for #name_type {
-			fn from_sql<'a>(_: &Type, raw: &'a [u8]) -> std::result::Result<Self, Box<dyn Error + Sync + Send>> {
-				let x = String::from_sql(&TEXT, raw)?;
-				match x.as_str() {
-					#match_arms
-					_       => Err(Box::new(EnumParseError::new(#name_str, x)))
-				}
-			}
-			fn accepts(ty: &Type) -> bool {
-				ty.oid() == #oid
-			}
-		}
-	};
-	// impl of ToSql for the enum
-	let to_sql_impl : Item = parse_quote!{
-		impl ToSql for #name_type {
-			fn to_sql(&self, _: &Type, w: &mut Vec<u8>) -> std::result::Result<IsNull, Box<dyn Error + Sync + Send>> {
-				w.extend_from_slice(match self {
-					#to_match_arms
-				});
-				Ok(IsNull::No)
-			}
-
-			fn accepts(ty: &Type) -> bool {
-				ty.oid() == #oid
-			}
-
-			to_sql_checked!();
-		}
-	};
-
-	vec![
-		full_enum.into(),
-		from_sql_impl,
-		to_sql_impl,
-	]
+	full_enum.into()
 }
 
-fn composite_to_ast_helper(c : &PsqlCompositeType, name : &str) ->  Vec<Item> {
+fn composite_to_ast_helper(c : &PsqlCompositeType, name : &str) ->  Item {
 	let name_type : Type  = syn::parse_str(name).unwrap();
 
-	let derive_thing : Attribute = parse_quote!{ #[derive(Debug, Clone)] };
+	let derive_thing : Attribute = parse_quote!{ #[derive(Debug, Clone, TryFromRow, ToSql, FromSql)] };
 	let struct_body : TokenStream = c.cols
 		.iter()
 		.map(|v| -> TokenStream {
@@ -237,33 +158,12 @@ fn composite_to_ast_helper(c : &PsqlCompositeType, name : &str) ->  Vec<Item> {
 	let mut full_struct : ItemStruct = parse_quote!{ pub struct #name_type { #struct_body } };
 	full_struct.attrs.push(derive_thing);
 
-	let from_row_code : TokenStream = c.cols
-		.iter()
-		.enumerate()
-		.map(|(i,v)| -> TokenStream {
-			let field_name : Type = syn::parse_str(&v.name).unwrap();
-			let index : LitInt = LitInt::new(&i.to_string(), Span::call_site());
-			parse_quote!{ #field_name : row.get(#index),}
-		}).collect();
-	let from_row_impl : Item = parse_quote!{
-		impl FromRow for #name_type {
-			fn from_row(row:Row) -> Self {
-				Self {
-					#from_row_code
-				}
-			}
-		}
-	};
-
-	vec![
-		full_struct.into(),
-		from_row_impl,
-	]
+	full_struct.into()
 }
 
-fn base_to_ast_helper(b : &PsqlBaseType) ->  Vec<Item> {
+fn base_to_ast_helper(b : &PsqlBaseType) -> Option<Item> {
 	let oid_type = match b.oid {
-		16 => return vec![parse_quote!{ pub use bool; }],
+		16 => return Some(parse_quote!{ pub use bool; }),
 		17 => "Vec<u8>",
 		20 => "i64",
 		23 => "i32",
@@ -275,22 +175,25 @@ fn base_to_ast_helper(b : &PsqlBaseType) ->  Vec<Item> {
 		1186 => "Interval",
 		1700 => "Decimal",
 		2278 => "()",
-		_ => return Vec::new() //format!("\ntype NoRustForSqlType_{} = ();", self.oid)
+		_ => return None //format!("\ntype NoRustForSqlType_{} = ();", self.oid)
 	};
 	let name_type : Type  = syn::parse_str(&b.name).unwrap();
 	let oid_type : Type = syn::parse_str(oid_type).unwrap();
-	vec![
-		parse_quote!{ pub type #name_type = #oid_type; }
-	]
+
+	Some(parse_quote!{ pub type #name_type = #oid_type; })
 }
 
-fn domain_to_ast_helper(b : &PsqlDomain, name : &str) ->  Vec<Item> {
+fn domain_to_ast_helper(b : &PsqlDomain, name : &str) ->  Item {
+	let derive_thing : Attribute = parse_quote!{ #[derive(Debug, Clone, TryFromRow, ToSql, FromSql)] };
 	let name_type : Type  = syn::parse_str(name).unwrap();
 	let schema_name : Type = syn::parse_str(&b.base_ns_name).unwrap();
 	let type_name   : Type = syn::parse_str(&b.base_name).unwrap();
-	vec![
-		parse_quote!{ pub type #name_type = #schema_name::#type_name; }
-	]
+	let mut full_struct : ItemStruct = parse_quote!{
+		pub struct #name_type(#schema_name::#type_name);
+	};
+	full_struct.attrs.push(derive_thing);
+
+	full_struct.into()
 }
 
 
@@ -299,8 +202,8 @@ impl ConvertToAst for Vec<SqlProc> {
 
 	fn to_rust_ast(&self) -> Self::Output {
 		match self.len() {
-			1 => self[0].to_rust_ast(),
 			0 => Vec::new(),
+			1 => self[0].to_rust_ast(),
 			_ => {
 				let name_type : Type  = syn::parse_str(&self[0].name).unwrap();
 				let trait_impls : TokenStream = self.iter().enumerate().map(|(i,p)| to_trait_impl(i,p)).collect();
@@ -329,23 +232,7 @@ impl ConvertToAst for Vec<SqlProc> {
 						#trait_impls
 					}
 				};
-				// vec![parse_quote!{
-				// 	/// This is an overloaded SQL function, it takes one tuple parameter.
-				// 	///
-				// 	/// Valid input types for this function are:
-				// 	#doc_comments
-				// 	pub fn #name_type<T:#name_type::OverloadTrait>(input : T) -> T::Output {
-				// 		<T as #name_type::OverloadTrait>::tmp(input)
-				// 	}
-				// 	mod #name_type {
-				// 		use super::*;
-				// 		pub trait OverloadTrait {
-				// 			type Output;
-				// 			fn tmp(self) -> Self::Output;
-				// 		}
-				// 		#trait_impls
-				// 	}
-				// }]
+
 				vec![
 					fn_code.into(),
 					mod_with_impls.into()
@@ -358,7 +245,7 @@ impl ConvertToAst for Vec<SqlProc> {
 fn to_trait_impl(index : usize, proc : &SqlProc) -> TokenStream {
 	//build SQL string to call proc
 	let new_name = format!("{}{}", proc.name, index);
-	proc.helper(&new_name, true,)
+	as_rust_helper(proc, &new_name, true,)
 		.iter().map(|v| v.to_token_stream()).collect()
 }
 fn to_tuple_type(types : &[TypeAndName]) -> Type {
@@ -380,6 +267,7 @@ fn to_tuple_pattern(types : &[TypeAndName]) -> TokenStream {
 	ret += ")";
 	syn::parse_str(&ret).unwrap()
 }
+
 fn to_overload_doc(procs : &[SqlProc]) -> Vec<Attribute> {
 	procs.iter().enumerate().map(|(i,v)| {
 		let name = &v.name;
@@ -403,112 +291,72 @@ fn to_overload_doc(procs : &[SqlProc]) -> Vec<Attribute> {
 	}).collect()
 }
 
-impl SqlProc {
-	fn helper(&self, name : &str, is_overide : bool) -> Vec<Item> {
-		let name_type : Type  = syn::parse_str(name).unwrap();
 
-		//build SQL string to call proc
-		let call_string_name : Type = syn::parse_str(&format!("{}_SQL", name.to_uppercase())).unwrap();
+fn as_rust_helper(proc : &SqlProc, name : &str, is_overide : bool) -> Vec<Item> {
+	let name_type : Type  = syn::parse_str(name).unwrap();
 
-		let call_string = make_call_string(&self.ns_name, &self.name, self.num_args as usize);
-		let call_string : Item = parse_quote!{ const #call_string_name : &str = #call_string; };
+	//build SQL string to call proc
+	let call_string_name : Type = syn::parse_str(&format!("{}_SQL", name.to_uppercase())).unwrap();
 
-		let mut ret = vec![
-			call_string,
-		];
+	let call_string = make_call_string(&proc.ns_name, &proc.name, proc.num_args as usize);
+	let call_string : Item = parse_quote!{ const #call_string_name : &str = #call_string; };
 
-		//if proc returns table create type for that proc
-		if let ProcOutput::NewType(tans) = &self.outputs {
-			let derive_thing : Attribute = parse_quote!{ #[derive(Debug, Clone)] };
-			let struct_body : TokenStream = tans
-				.iter()
-				.map(|tan| -> TokenStream {
-					let field_name : Ident = syn::parse_str(&tan.name).unwrap();
-					let type_name : TokenStream = syn::parse_str(&tan.typ).unwrap();
-					// let field_name : Ident = syn::parse_str(&tan.name).unwrap();
-					// let type_name : TokenStream = syn::parse_str("()").unwrap();
-					// println!("{}\n{}\n\n", field_name, type_name);
-					parse_quote!{
-						pub #field_name : #type_name,
-					}
-				}).collect();
-			// println!();
-			//FIXME idon't think #(#name_type)Return worked, gotta amke/parse a string here
-			let struct_name : Ident = syn::parse_str(&format!("{}Return", name)).unwrap();
-			let mut full_struct : ItemStruct = parse_quote!{ pub struct #struct_name { #struct_body } };
-			full_struct.attrs.push(derive_thing);
+	let mut ret = vec![
+		call_string,
+	];
 
-			let from_row_code : TokenStream = tans
-				.iter()
-				.enumerate()
-				.map(|(i,tan)| -> TokenStream {
-					let field_name : Type = syn::parse_str(&tan.name).unwrap();
-					let index : LitInt = LitInt::new(&i.to_string(), Span::call_site());
-					parse_quote!{ #field_name : row.get(#index),}
-				}).collect();
-			let from_row_impl : Item = parse_quote! {
-				impl FromRow for #struct_name {
-					fn from_row(row:Row) -> Self {
-						Self {
-							#from_row_code
-						}
-					}
+	//if proc returns table create type for that proc
+	if let ProcOutput::NewType(tans) = &proc.outputs {
+		let derive_thing : Attribute = parse_quote!{ #[derive(Debug, Clone, TryFromRow, ToSql, FromSql)] };
+		let struct_body : TokenStream = tans
+			.iter()
+			.map(|tan| -> TokenStream {
+				let field_name : Ident = syn::parse_str(&tan.name).unwrap();
+				let type_name : TokenStream = syn::parse_str(&tan.typ).unwrap();
+				parse_quote!{
+					pub #field_name : #type_name,
 				}
-			};
+			}).collect();
+		// println!();
+		let struct_name : Ident = syn::parse_str(&format!("{}Return", name)).unwrap();
+		let mut full_struct : ItemStruct = parse_quote!{ pub struct #struct_name { #struct_body } };
+		full_struct.attrs.push(derive_thing);
 
-			ret.push(full_struct.into());
-			ret.push(from_row_impl);
-		}
+		ret.push(full_struct.into());
+	}
 
-		//get the output type name
-		let ret_type_name = match &self.outputs {
-			ProcOutput::Existing(t) => {
-				if t == "pg_catalog::record" {
-					return Vec::new();
-				} else {
-					t.clone()
-				}
-			},
-			ProcOutput::NewType(_) => format!("{}Return", name)
-		};
-		let ret_type_name : Type = syn::parse_str(&ret_type_name).unwrap();
-		let new_ret_type_name : Type=
-			if self.returns_set {
-				parse_quote!{ Vec<#ret_type_name> }
+	//get the output type name
+	let ret_type_name = match &proc.outputs {
+		ProcOutput::Existing(t) => {
+			if t == "pg_catalog::record" {
+				return Vec::new();
 			} else {
-				parse_quote!{ Option<#ret_type_name> }
-			};
-
-		let func_params : TokenStream = self.inputs.as_function_params();
-		let query_params : TokenStream = as_query_params(&self.inputs);
-		let final_call = if self.returns_set { "collect" } else { "next" };
-		let final_call : Ident = syn::parse_str(final_call).unwrap();
-		let func_text : Item =
-		if is_overide {
-			let tuple_type : Type = to_tuple_type(&self.inputs);
-			let tuple_pattern : TokenStream = to_tuple_pattern(&self.inputs);
-			parse_quote!{
-				impl OverloadTrait for #tuple_type {
-					type Output = SqlResult<#new_ret_type_name>;
-					fn tmp(self) -> Self::Output {
-						let #tuple_pattern = self;
-						Ok(
-							conn
-							.prepare_cached(#call_string_name)?
-							.query(&[#query_params])?
-							.into_iter()
-							.map(#ret_type_name::from_row)
-							.#final_call()
-						)
-					}
-				}
+				t.clone()
 			}
+		},
+		ProcOutput::NewType(_) => format!("{}Return", name)
+	};
+	let ret_type_name : Type = syn::parse_str(&ret_type_name).unwrap();
+	let new_ret_type_name : Type=
+		if proc.returns_set {
+			parse_quote!{ Vec<#ret_type_name> }
 		} else {
-			parse_quote!{
-				pub fn #name_type(
-					conn : &Connection,
-					#func_params
-				) -> SqlResult<#new_ret_type_name> {
+			parse_quote!{ Option<#ret_type_name> }
+		};
+
+	let func_params : TokenStream = proc.inputs.as_function_params();
+	let query_params : TokenStream = as_query_params(&proc.inputs);
+	let final_call = if proc.returns_set { "collect" } else { "next" };
+	let final_call : Ident = syn::parse_str(final_call).unwrap();
+	let func_text : Item =
+	if is_overide {
+		let tuple_type : Type = to_tuple_type(&proc.inputs);
+		let tuple_pattern : TokenStream = to_tuple_pattern(&proc.inputs);
+		parse_quote!{
+			impl OverloadTrait for #tuple_type {
+				type Output = SqlResult<#new_ret_type_name>;
+				fn tmp(self) -> Self::Output {
+					let #tuple_pattern = self;
 					Ok(
 						conn
 						.prepare_cached(#call_string_name)?
@@ -518,20 +366,36 @@ impl SqlProc {
 						.#final_call()
 					)
 				}
-
 			}
-		};
+		}
+	} else {
+		parse_quote!{
+			pub fn #name_type(
+				conn : &Connection,
+				#func_params
+			) -> SqlResult<#new_ret_type_name> {
+				Ok(
+					conn
+					.prepare_cached(#call_string_name)?
+					.query(&[#query_params])?
+					.into_iter()
+					.map(#ret_type_name::from_row)
+					.#final_call()
+				)
+			}
 
-		ret.push(func_text);
-		ret
-	}
+		}
+	};
+
+	ret.push(func_text);
+	ret
 }
 
 
 impl ConvertToAst for SqlProc {
 	type Output = Vec<Item>;
 	fn to_rust_ast(&self) -> Self::Output {
-		self.helper(&self.name, false)
+		as_rust_helper(&self, &self.name, false)
 	}
 }
 

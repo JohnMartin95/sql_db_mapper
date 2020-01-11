@@ -6,26 +6,6 @@ pub trait ConvertToRust {
 	}
 }
 
-impl FullDB {
-	pub fn add_schema(&mut self, schema : Schema) {
-		self.schemas.push(schema);
-	}
-}
-
-const FROM_ROW_TYPES : [&str; 11]= [
-"bool",
-"Vec<u8>",
-"i64",
-"i32",
-"u32",
-"String",
-"NaiveDate",
-"NaiveDateTime",
-"DateTime<Utc>",
-"Interval",
-"Decimal"
-];
-
 impl ConvertToRust for FullDB {
 	fn as_rust_string(&self) -> String{
 		let mut ret = String::new();
@@ -33,15 +13,9 @@ impl ConvertToRust for FullDB {
 r#"#![allow(non_snake_case)]
 #![allow(unused_imports)]
 #![allow(non_camel_case_types)]
-pub use sql_db_mapper::helper_types::{ orm, exports::* };
+pub use sql_db_mapper_core as orm;
 use orm::*;
 "#;
-		// ret += "use postgres::types::{FromSql, Type, TEXT};\n";
-		ret += &"trait FromRow { fn from_row(row:Row) -> Self; }\n".to_string();
-		ret += &"impl FromRow for () { fn from_row(_row:Row) -> Self {} }\n".to_string();
-		for s in FROM_ROW_TYPES.iter() {
-			ret += &format!("impl FromRow for {} {{ fn from_row(row:Row) -> Self {{ row.get(0) }} }}\n", s);
-		}
 		for schema in &self.schemas {
 			// println!("{}", schema.name);
 			ret += &schema.as_rust_string();
@@ -51,161 +25,19 @@ use orm::*;
 	}
 }
 
-impl Schema {
-	pub fn add_type(&mut self, typ : PsqlType) {
-		self.types.push(typ);
-	}
-	// pub fn add_proc(&mut self, proc : SqlProc) {
-	// 	self.procs.push(proc);
-	// }
-	pub fn append(&mut self, mut all_procs : Vec<Vec<SqlProc>>) {
-		self.procs.append(&mut all_procs);
-	}
-}
 impl ConvertToRust for Schema {
 	fn as_rust_string(&self) -> String {
-		let mut ret = String::new();
-		ret += &format!("\npub mod {} {{\n\tuse super::*;\n", self.name);
-		for typ in &self.types {
-			ret += &typ.as_rust_string().replace("\n", "\n\t").replace("\n\t\n", "\n\n");
-		}
-		for procs_with_samne_name in &self.procs {
-			match procs_with_samne_name.len() {
-				//no overloading
-				1          => ret += &procs_with_samne_name[0].as_rust_string().replace("\n", "\n\t").replace("\n\t\n", "\n\n"),
-				x if x > 1 => ret += &overload_fn_to_rust_string(procs_with_samne_name).replace("\n", "\n\t").replace("\n\t\n", "\n\n"),
-				//ignore case where Vec is empty
-				_ => (),
-			}
-			// if procs_with_samne_name.len() == 1 {
-			// 	ret += &procs_with_samne_name[0].as_rust_string().replace("\n", "\n\t").replace("\n\t\n", "\n\n");
-			// } else if procs_with_samne_name.len() > 1 {
-			// 	ret += &overload_fn_to_rust_string(procs_with_samne_name).replace("\n", "\n\t").replace("\n\t\n", "\n\n");
-			// }
-		}
-		ret += &"\n}\n".to_string();
-		ret
-	}
-}
-fn overload_fn_to_rust_string(procs : &[SqlProc]) -> String {
-	format!(
-r#"/// This is an overloaded SQL function, it takes one tuple parameter.
-///
-///Valid input types for this function are:
-///{2}
-pub fn {0}<T:{0}::OverloadTrait>(input : T) -> T::Output {{
-	<T as {0}::OverloadTrait>::tmp(input)
-}}
-mod {0} {{
-	use super::*;
-	pub trait OverloadTrait {{
-		type Output;
-		fn tmp(self) -> Self::Output;
-	}}
-	{1}
-}}"#,
-		procs[0].name,
-		to_trait_impls(procs).replace("\n", "\n\t").replace("\n\t\n", "\n\n"),
-		to_overload_doc(procs),
-	)
-}
+		let content : String =
+			self.types.iter().map(|typ| {
+				typ.as_rust_string().replace("\n", "\n\t").replace("\n\t\n", "\n\n")
+			}).chain(
+				self.procs.iter().map(|procs_with_samne_name| {
+					procs_with_samne_name.as_rust_string().replace("\n", "\n\t").replace("\n\t\n", "\n\n")
+				})
+			).collect();
 
-fn to_overload_doc(procs : &[SqlProc]) -> String {
-	let mut ret = String::new();
-	for proc in procs {
-		ret += &format!(
-			"\n/// * {}((\n/// \tconn : &Connection,{}\n/// )) -> {}",
-			proc.name,
-			proc.inputs.as_function_params().replace("\n", "\n/// "),
-			proc.get_ret_type().1.replace("<", "&lt;").replace(">", "&gt;")
-		);
+		format!("\npub mod {} {{\n\tuse super::*;\n{}\n}}\n", self.name, content)
 	}
-	ret
-}
-
-fn to_trait_impls(procs : &[SqlProc]) -> String {
-	procs.iter().enumerate().map(|(i,p)| to_trait_impl(i,p)).collect()
-}
-
-fn to_trait_impl(index : usize, proc : &SqlProc) -> String {
-	let mut ret = "\n".to_owned();
-	//build SQL string to call proc
-	let call_string_name = format!("{}{}_SQL", proc.name.to_uppercase(), index);
-
-	let mut call_string = format!(r#"const {} : &str = "SELECT * FROM \"{}\".\"{}\"("#, call_string_name, proc.ns_name, proc.name);
-	for i in 1..proc.num_args {
-		call_string += &format!("${},", i);
-	}
-	call_string += &format!("${})\";\n", proc.num_args);
-	ret += &call_string;
-
-	//if proc returns table create type for that proc
-	if let ProcOutput::NewType(tans) = &proc.outputs {
-		ret += &format!("#[derive(Debug, Clone)]\npub struct {}{}Return {{{}\n}}\n", proc.name, index, tans.as_rust_string());
-		ret += &format!("impl FromRow for {}Return {{\n\tfn from_row(row:Row) -> Self {{\n\t\tSelf {{{}\n\t\t}}\n\t}}\n}}\n", proc.name, tans.to_impl());
-	}
-	//get the output type name
-	let ret_type_name = match &proc.outputs {
-		ProcOutput::Existing(t) => t.clone(),
-		ProcOutput::NewType(_) => format!("{}{}Return", proc.name, index)
-	};
-	if ret_type_name == "pg_catalog::record" {
-		return "".to_owned();
-	}
-	let new_ret_type_name =
-		if proc.returns_set {
-			format!("Vec<{}>", ret_type_name)
-		} else {
-			format!("Option<{}>", ret_type_name)
-		};
-	//make function string
-	let func_text = format!(
-r#"
-impl OverloadTrait for {} {{
-	type Output = SqlResult<{}>;
-	fn tmp(self) -> Self::Output {{
-		let {} = self;
-		Ok(
-			conn
-			.prepare_cached({})?
-			.query(&[{}])?
-			.into_iter()
-			.map({}::from_row)
-			.{}()
-		)
-	}}
-}}
-"#,
-		to_tuple_type(&proc.inputs),
-		new_ret_type_name,
-		to_tuple_pattern(&proc.inputs).replace("\n", "\n\t"),
-		call_string_name,
-		proc.inputs.as_query_params(),
-		ret_type_name,
-		if proc.returns_set { "collect" } else { "next" },
-	);
-	ret += &func_text;
-
-	ret
-}
-fn to_tuple_type(types : &[TypeAndName]) -> String {
-	let mut ret = String::from("(&Connection, ");
-	for tan in types {
-		ret += "&";
-		ret += &tan.typ;
-		ret += ", ";
-	}
-	ret += ")";
-	ret
-}
-fn to_tuple_pattern(types : &[TypeAndName]) -> String {
-	let mut ret = String::from("(conn, ");
-	for tan in types {
-		ret += &tan.name;
-		ret += ", ";
-	}
-	ret += ")";
-	ret
 }
 
 impl ConvertToRust for PsqlType {
@@ -213,26 +45,23 @@ impl ConvertToRust for PsqlType {
 		use PsqlTypType::*;
 		match &self.typ {
 			Enum(e) => {
-				format!("\n#[derive(Debug, Clone)]\npub enum {} {{{}\n}}\n",
+				format!("\n#[derive(Debug, Clone, TryFromRow, ToSql, FromSql)]\npub enum {} {{{}\n}}\n",
 					self.name,
 					e.as_rust_string()
 				)
-				+
-				&e.to_impl(&self.name, self.oid)
 			},
 			Composite(c) => {
-				format!("\n#[derive(Debug, Clone)]\npub struct {} {{{}\n}}\nimpl FromRow for {} {{\n\tfn from_row(row:Row) -> Self {{\n\t\tSelf {{{}\n\t\t}}\n\t}}\n}}\n",
+				format!("\n#[derive(Debug, Clone, TryFromRow, ToSql, FromSql)]\npub struct {} {{{}\n}}\n",
 					self.name,
 					c.as_rust_string(),
-					self.name,
-					c.to_impl()
 				)
 			},
 			Base(b) => b.as_rust_string(),
 			Domain(d) => {
-				format!("\npub type {} = {};",
+				format!("\n#[derive(Debug, Clone, TryFromRow, ToSql, FromSql)]\npub struct {}({}::{});",
 					self.name,
-					d.as_rust_string()
+					d.base_ns_name,
+					d.base_name,
 				)
 			},
 			Other => {
@@ -258,44 +87,6 @@ impl ConvertToRust for PsqlEnumType {
 		})
 	}
 }
-impl PsqlEnumType {
-	pub fn to_impl(&self, name : &str, oid : u32) -> String {
-		let mut match_arms = String::new();
-		let mut to_match_arms = String::new();
-		for lab in self.labels.iter() {
-			match_arms += &format!("\"{}\" => Ok(Self::{}),\n\t\t\t", lab, lab);
-			to_match_arms += &format!("Self::{} => b\"{}\",\n\t\t\t", lab, lab);
-		}
-		//the return string
-		format!(
-r#"impl FromSql for {} {{
-	fn from_sql<'a>(_: &Type, raw: &'a [u8]) -> std::result::Result<Self, Box<dyn Error + Sync + Send>> {{
-		let x = String::from_sql(&TEXT, raw)?;
-		match x.as_str() {{
-			{}_       => Err(Box::new(EnumParseError::new("{}", x)))
-		}}
-	}}
-	fn accepts(ty: &Type) -> bool {{
-		ty.oid() == {}
-	}}
-}}
-impl ToSql for {} {{
-	fn to_sql(&self, _: &Type, w: &mut Vec<u8>) -> std::result::Result<IsNull, Box<dyn Error + Sync + Send>> {{
-		w.extend_from_slice(match self {{
-			{}
-		}});
-		Ok(IsNull::No)
-	}}
-
-	fn accepts(ty: &Type) -> bool {{
-		ty.oid() == {}
-	}}
-
-	to_sql_checked!();
-}}
-"#, name, match_arms, name, oid, name, to_match_arms, oid)
-	}
-}
 
 impl ConvertToRust for PsqlCompositeType {
 	fn as_rust_string(&self) -> String {
@@ -306,15 +97,6 @@ impl ConvertToRust for PsqlCompositeType {
 		}).fold(String::new(), |acc, s| {
 			format!("{}\n\t{},", acc, s)
 		})
-	}
-}
-impl ToImpl for PsqlCompositeType {
-	fn to_impl(&self) -> String {
-		let mut ret = String::new();
-		for (i, col) in self.cols.iter().enumerate() {
-			ret += &format!("\n\t\t\t{} : row.get({}),", col.name, i);
-		}
-		ret
 	}
 }
 
@@ -340,16 +122,171 @@ impl ConvertToRust for PsqlBaseType {
 	}
 }
 
-impl ConvertToRust for PsqlDomain {
+impl ConvertToRust for Vec<SqlProc> {
 	fn as_rust_string(&self) -> String {
-		format!("{}::{}", self.base_ns_name, self.base_name)
+		let trait_impls : String = self.iter().enumerate().map(|(i,p)| to_trait_impl(i,p)).collect();
+		match self.len() {
+			//no overloading
+			0 => String::new(),
+			1 => self[0].as_rust_string(),
+			_ => {
+				let doc_comments : String = self.iter().map(|s| {
+					format!(
+						"\n/// * {}((\n/// \tconn : &Connection,{}\n/// )) -> {}",
+						s.name,
+						s.inputs.as_function_params().replace("\n", "\n/// "),
+						s.get_ret_type().1.replace("<", "&lt;").replace(">", "&gt;")
+					)
+				}).collect();
+				format!(
+			r#"/// This is an overloaded SQL function, it takes one tuple parameter.
+///
+///Valid input types for this function are:
+///{2}
+pub fn {0}<T:{0}::OverloadTrait>(input : T) -> T::Output {{
+	<T as {0}::OverloadTrait>::tmp(input)
+}}
+mod {0} {{
+	use super::*;
+	pub trait OverloadTrait {{
+		type Output;
+		fn tmp(self) -> Self::Output;
+	}}
+	{1}
+}}"#,
+					self[0].name,
+					trait_impls.replace("\n\t\n", "\n\n"),
+					doc_comments,
+				)
+			},
+		}
 	}
+}
+
+fn to_trait_impl(index : usize, proc : &SqlProc) -> String {
+	as_rust_helper(proc, &format!("{}{}", proc.name, index), true)
+}
+fn to_tuple_type(types : &[TypeAndName]) -> String {
+	let mut ret = String::from("(&Connection, ");
+	for tan in types {
+		ret += "&";
+		ret += &tan.typ;
+		ret += ", ";
+	}
+	ret += ")";
+	ret
+}
+fn to_tuple_pattern(types : &[TypeAndName]) -> String {
+	let mut ret = String::from("(conn, ");
+	for tan in types {
+		ret += &tan.name;
+		ret += ", ";
+	}
+	ret += ")";
+	ret
 }
 
 impl ConvertToRust for Column {
 	fn as_rust_string(&self) -> String {
 		format!("pub {} : crate::{}::{}", self.name, self.type_ns_name, self.type_name)
 	}
+}
+
+fn as_rust_helper(proc : &SqlProc, name : &str, is_overide : bool) -> String {
+	let mut ret = "\n".to_owned();
+	//build SQL string to call proc
+	let call_string_name = format!("{}_SQL", name.to_uppercase());
+
+	let call_string = make_call_string(&proc.ns_name, &proc.name, proc.num_args as usize);
+	let call_string = format!("const {} : &str = {};\n", call_string_name, call_string);
+	ret += &call_string;
+
+	//if proc returns table create type for that proc
+	if let ProcOutput::NewType(tans) = &proc.outputs {
+		let struct_body : String = tans.iter().map(|tan| {
+			format!("\n\t\tpub {} : {},", tan.name, tan.typ)
+		}).collect();
+		ret += &format!("#[derive(Debug, Clone, TryFromRow, ToSql, FromSql)]\npub struct {}Return {{{}\n}}\n", proc.name, struct_body);
+	}
+	//get the output type name
+	let ret_type_name = match &proc.outputs {
+		ProcOutput::Existing(t) => {
+			if t == "pg_catalog::record" {
+				return String::new();
+			} else {
+				t.clone()
+			}
+		},
+		ProcOutput::NewType(_) => format!("{}Return", name)
+	};
+	let new_ret_type_name : String =
+		if proc.returns_set {
+			format!{ "Vec<{}>", ret_type_name }
+		} else {
+			format!{ "Option<{}>", ret_type_name }
+		};
+
+	//make function string
+	let func_params = proc.inputs.as_function_params();
+	let query_params = as_query_params(&proc.inputs);
+	let final_call = if proc.returns_set { "collect" } else { "next" };
+	let func_text =
+	if is_overide {
+		let tuple_type = to_tuple_type(&proc.inputs);
+		let tuple_pattern = to_tuple_pattern(&proc.inputs);
+		format!(
+r"
+impl OverloadTrait for {} {{
+	type Output = SqlResult<{}>;
+	fn tmp(self) -> Self::Output {{
+		let {} = self;
+		Ok(
+			conn
+			.prepare_cached({})?
+			.query(&[{}])?
+			.into_iter()
+			.map({}::from_row)
+			.{}()
+		)
+	}}
+}}
+",
+			tuple_type,
+			new_ret_type_name,
+			tuple_pattern,
+			call_string_name,
+			query_params,
+			ret_type_name,
+			final_call,
+		)
+	} else {
+		format!(
+r"pub fn {}(
+conn : &Connection,{}
+) -> SqlResult<{}> {{
+Ok(
+	conn
+	.prepare_cached({})?
+	.query(&[{}])?
+	.into_iter()
+	.map({}::from_row)
+	.{}()
+)
+}}
+",
+			proc.name,
+			func_params,
+			new_ret_type_name,
+			call_string_name,
+			query_params,
+			ret_type_name,
+			final_call,
+		)
+	};
+	ret += &func_text;
+
+	ret
+
 }
 
 impl SqlProc {
@@ -371,53 +308,7 @@ impl SqlProc {
 
 impl ConvertToRust for SqlProc {
 	fn as_rust_string(&self) -> String {
-		let mut ret = "\n".to_owned();
-		//build SQL string to call proc
-		let call_string_name = format!("{}_SQL", self.name.to_uppercase());
-
-		let mut call_string = format!(r#"const {} : &str = "SELECT * FROM \"{}\".\"{}\"("#, call_string_name, self.ns_name, self.name);
-		for i in 1..self.num_args {
-			call_string += &format!("${},", i);
-		}
-		call_string += &format!("${})\";\n", self.num_args);
-		ret += &call_string;
-
-		//if proc returns table create type for that proc
-		if let ProcOutput::NewType(tans) = &self.outputs {
-			ret += &format!("#[derive(Debug, Clone)]\npub struct {}Return {{{}\n}}\n", self.name, tans.as_rust_string());
-			ret += &format!("impl FromRow for {}Return {{\n\tfn from_row(row:Row) -> Self {{\n\t\tSelf {{{}\n\t\t}}\n\t}}\n}}\n", self.name, tans.to_impl());
-		}
-		//get the output type name
-		let (ret_type_name, new_ret_type_name) = self.get_ret_type();
-		if ret_type_name == "pg_catalog::record" {
-			return "".to_owned();
-		}
-		//make function string
-		let func_text = format!(
-r"pub fn {}(
-	conn : &Connection,{}
-) -> SqlResult<{}> {{
-	Ok(
-		conn
-		.prepare_cached({})?
-		.query(&[{}])?
-		.into_iter()
-		.map({}::from_row)
-		.{}()
-	)
-}}
-",
-			self.name,
-			self.inputs.as_function_params(),
-			new_ret_type_name,
-			call_string_name,
-			self.inputs.as_query_params(),
-			ret_type_name,
-			if self.returns_set { "collect" } else { "next" }
-		);
-		ret += &func_text;
-
-		ret
+		as_rust_helper(&self, &self.name, false)
 	}
 }
 
@@ -439,23 +330,29 @@ impl ToFuncParams for Vec<TypeAndName> {
 		ret
 	}
 }
-trait ToQueryParams {
-	fn as_query_params(&self) -> String;
-}
+
 trait ToFuncParams {
 	fn as_function_params(&self) -> String;
 }
 trait ToImpl {
 	fn to_impl(&self) -> String;
 }
-impl ToQueryParams for Vec<TypeAndName> {
-	fn as_query_params(&self) -> String {
-		let mut ret = String::new();
-		for tan in self {
-			ret += &format!("{}, ", tan.name);
-		}
-		ret
+
+fn make_call_string(namespace : &str, function : &str, len : usize) -> String {
+	let mut ret = format!(r#""SELECT * FROM \"{}\".\"{}\"("#, namespace, function);
+	for i in 1..len {
+		ret += &format!("${},", i);
 	}
+	ret += &format!("${})\"", len);
+	ret
+}
+
+fn as_query_params(inputs : &[TypeAndName]) -> String {
+	let mut ret = String::new();
+	for tan in inputs {
+		ret += &format!("{}, ", tan.name);
+	}
+	ret
 }
 impl ToImpl for Vec<TypeAndName> {
 	fn to_impl(&self) -> String {

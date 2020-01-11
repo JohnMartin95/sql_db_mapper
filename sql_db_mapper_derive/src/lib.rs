@@ -22,8 +22,16 @@ pub fn try_from_tokio_postgres_row(input: proc_macro::TokenStream) -> proc_macro
 
 	let fields = match input.data {
 		syn::Data::Struct(x) => x.fields,
-		syn::Data::Enum(_) => panic!("Cannot derive TryFrom<Row> automatically for enum types"),
-		syn::Data::Union(_) => panic!("Cannot derive TryFrom<Row> automatically for union types"),
+		syn::Data::Enum(_) => {
+			return quote! {
+				impl #impl_generics TryFromRow for #name #ty_generics #where_clause {
+					fn from_row(row: Row) -> ::core::result::Result<Self, SqlError> {
+						row.try_get(0)
+					}
+				}
+			}.into();
+		},
+		syn::Data::Union(_) => panic!("Cannot derive TryFromRow automatically for union types"),
 	};
 
 	let from_row_code = match fields {
@@ -47,14 +55,19 @@ pub fn try_from_tokio_postgres_row(input: proc_macro::TokenStream) -> proc_macro
 			quote!{ Self ( #tmp ) }
 		},
 		syn::Fields::Unit => {
-			panic!("Cannot derive TryFrom<Row> automatically for unit types");
+			return quote! {
+				impl #impl_generics TryFromRow for #name #ty_generics #where_clause {
+					fn from_row(_row: Row) -> ::core::result::Result<Self, SqlError> {
+						Ok(Self)
+					}
+				}
+			}.into();
 		},
 	};
 
 	let expanded = quote! {
-		impl #impl_generics core::convert::TryFrom<Row> for #name #ty_generics #where_clause {
-			type Error = SqlError;
-			fn try_from(row: Row) -> core::result::Result<Self, Self::Error> {
+		impl #impl_generics TryFromRow for #name #ty_generics #where_clause {
+			fn from_row(row: Row) -> ::core::result::Result<Self, SqlError> {
 				#from_row_code
 			}
 		}
