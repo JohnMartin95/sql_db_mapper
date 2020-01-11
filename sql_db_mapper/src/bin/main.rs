@@ -35,7 +35,7 @@ fn main() {
 	let conn = Connection::connect(connection_string, TlsMode::None).unwrap();
 	std::mem::drop(args);
 
-	println!("[dependencies]\nsql_db_mapper = \"{}\"\n\n", VERSION);
+	println!("[dependencies]\nsql_db_mapper = \"{}\"\npostgres-types = \"0.1\"\n\n", VERSION);
 
 	let conn = MyConnection::new(&conn);
 	let mut full_db = FullDB {schemas : Vec::new()};

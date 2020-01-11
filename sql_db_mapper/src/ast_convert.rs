@@ -8,7 +8,6 @@ use proc_macro2::{
 	TokenStream,
 };
 
-
 /// helper trait that does extend but consumes and returns self
 trait MyExtend<A> : Extend<A> {
 	fn extend2<I: IntoIterator<Item=A>>(self, iter: I) -> Self;
@@ -58,15 +57,12 @@ impl ConvertToAst for FullDB {
 			items: vec![
 				parse_quote!{ pub use sql_db_mapper_core as orm; },
 				parse_quote!{ use orm::*; },
-				parse_quote!{ use sql_db_mapper_derive::TryFromRow; },
 			].extend2(
 				self.schemas.iter().map(ConvertToAst::to_rust_ast).map(Item::Mod)
 			),
 		}
 	}
 }
-
-
 
 impl ConvertToAst for Schema {
 	type Output = ItemMod;
