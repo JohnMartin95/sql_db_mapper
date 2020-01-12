@@ -11,13 +11,7 @@ use sql_db_mapper::{
 	VERSION,
 };
 
-// #[cfg(feature = "use_ast")]
-// use quote::ToTokens;
-
-#[cfg(feature = "use_ast")]
 use sql_db_mapper::ast_convert::*;
-
-
 
 fn main() {
 	let opt = Opt::from_args();
@@ -43,10 +37,7 @@ async-trait = "0.1.22"
 	let mut conn = MyClient::new(conn);
 	let full_db = conn.get_all();
 
-	#[cfg(feature = "use_ast")]
 	let code_string = full_db.as_string(&opt);
-	#[cfg(not(feature = "use_ast"))]
-	let code_string = full_db.as_rust_string();
 
 	let final_str =
 		if opt.ugly {

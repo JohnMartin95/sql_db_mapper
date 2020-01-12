@@ -1,12 +1,13 @@
-//! Connects to a PostgreSQL database and creates a rust module representing the schema complete with mappings for stored functions/procedures
+//! Connects to a PostgreSQL database and creates a rust module representing all the schemas complete with mappings for stored functions/procedures
 
 pub mod connection;
 
-pub mod db_model;
+// Code generation using strings is being depreciated for now
+// however I'm leaving it in as commented out code because it was signicantly faster than using syn and quote
+// mod db_model;
 
 mod sql_tree;
 
-#[cfg(feature = "use_ast")]
 pub mod ast_convert;
 
 
@@ -44,6 +45,11 @@ pub struct Opt {
 	pub output: Option<PathBuf>,
 }
 
+/// Calls rustfmt (the program) on the input
+///
+/// On any rustfmt error stderr is written to and a copy of the input is returned
+///
+/// Can panics if acquiring/writing to stdin fails or the the text written to stdout or stderr by rustfmt is not valid utf8
 pub fn format_rust(value: &str) -> String {
 	use std::{
 		process::{

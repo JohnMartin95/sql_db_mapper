@@ -1,4 +1,6 @@
+//! A simple AST of a PostgreSQL database
 
+/// The root Node of the database, contains all the schemas
 #[derive(Debug, Clone)]
 pub struct FullDB {
 	pub schemas : Vec<Schema>,
@@ -10,6 +12,9 @@ impl FullDB {
 	}
 }
 
+/// Database schema. COntains all Types and procedures defined inside
+///
+/// All sql procures with overloading (the same name) are stored in a Vec the the length of the `procs` Vec is the number of unique procedure names in the schema
 #[derive(Debug, Clone)]
 pub struct Schema {
 	pub id : SchemaId,
@@ -43,10 +48,15 @@ pub struct PsqlType {
 
 #[derive(Debug, Clone)]
 pub enum PsqlTypType {
+	/// pg_type.typtype e
 	Enum(PsqlEnumType),
+	/// pg_type.typtype c
 	Composite(PsqlCompositeType),
+	/// pg_type.typtype b
 	Base(PsqlBaseType),
+	/// pg_type.typtype d
 	Domain(PsqlDomain),
+	/// Types not included above (p, r) Currently ignored but may be used in the future
 	Other
 }
 
@@ -64,13 +74,11 @@ pub struct PsqlCompositeType {
 pub struct Column {
 	pub pos : i16,
 	pub name : String,
-	pub type_id : TypeId,
+	pub type_id : u32,
 	pub type_name : String,
 	pub type_ns_name : String,
 	pub not_null : bool
 }
-
-type TypeId = u32;
 
 #[derive(Debug, Clone)]
 pub struct PsqlBaseType {
@@ -103,8 +111,11 @@ pub struct TypeAndName {
 	pub name : String
 }
 
+/// The return type of a procedure
 #[derive(Debug, Clone)]
 pub enum ProcOutput {
+	/// The procedure returns an existing type (columns of a table, user defined enum)
 	Existing(String),
+	/// The procedure returns a new anonymous type
 	NewType(Vec<TypeAndName>)
 }

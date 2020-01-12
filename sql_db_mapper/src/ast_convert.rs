@@ -1,3 +1,5 @@
+//! Turn the AST of the database from sql_tree into a Rust syntax tree fron syn
+
 use super::{
 	sql_tree::*,
 	Opt,
@@ -23,6 +25,9 @@ impl<T, A: Extend<T>> MyExtend<T> for A {
 	}
 }
 
+/// Takes a reference to a struct and the program options and returns a new type
+///
+/// Used to turn the types in sql_tree into a Rust syntax tree
 pub trait ConvertToAst {
 	type Output;
 	fn to_rust_ast(&self, opt : &Opt) -> Self::Output;
@@ -35,20 +40,21 @@ pub trait ConvertToAst {
 
 impl ConvertToAst for FullDB {
 	type Output = File;
-	/** Turn a full database structure into a single rust file mapping all it's types and functions
 
-	```ignore
-	#![allow(non_snake_case)]
-	#![allow(unused_imports)]
-	#![allow(non_camel_case_types)]
-	pub use sql_db_mapper::helper_types::{
-		orm,
-		exports::*
-	};
-	use orm::*;
-
-	//code for each schema here
-	``` */
+	/// Turn a full database structure into a single rust file mapping all it's types and functions
+	///
+	/// ```ignore
+	/// #![allow(non_snake_case)]
+	/// #![allow(unused_imports)]
+	/// #![allow(non_camel_case_types)]
+	/// pub use sql_db_mapper::helper_types::{
+	/// 	orm,
+	/// 	exports::*
+	/// };
+	/// use orm::*;
+	///
+	/// //code for each schema here
+	/// ```
 	fn to_rust_ast(&self, opt : &Opt) -> Self::Output {
 		File {
 			shebang: None,
@@ -70,17 +76,17 @@ impl ConvertToAst for FullDB {
 impl ConvertToAst for Schema {
 	type Output = ItemMod;
 
-	/** Renders a schema as a rust module
-
-	```ignore
-	mod #schema_name {
-		use super::*;
-
-		//code for all tables and other types
-
-		//code for each procedures/function
-	}
-	``` */
+	/// Renders a schema as a rust module
+	///
+	/// ```ignore
+	/// mod #schema_name {
+	/// 	use super::*;
+	///
+	/// 	//code for all tables and other types
+	///
+	/// 	//code for each procedures/function
+	/// }
+	/// ```
 	fn to_rust_ast(&self, opt : &Opt) -> Self::Output {
 		let name = Ident::new(&self.name, Span::call_site());
 		let content : TokenStream =
@@ -99,7 +105,38 @@ impl ConvertToAst for Schema {
 
 impl ConvertToAst for PsqlType {
 	type Output = Option<Item>;
-
+	/// Takes a SQL type and renders its Rust equivalent
+	///
+	/// All the generated typs include derives for Debug, Clone, FromSql, ToSql, and TryFromRow (which allows straight conversion from the postgres and tokio-postgres Row struct into the type)
+	///
+	/// ```ignore
+	/// //an postgres enum type
+	/// #[derive(Debug, Clone, TryFromRow, ToSql, FromSql)]
+	/// pub enum MySqlEnum {
+	/// 	Variant1,
+	/// 	Variant2,
+	/// }
+	///
+	/// // a composite type; the type of a table, view, or anonymous record returned by a procedure
+	/// #[derive(Debug, Clone, TryFromRow, ToSql, FromSql)]
+	/// pub struct MyTable {
+	/// 	// super prevents lookup errors when the schecma name is the same as the type name
+	/// 	pub field0: super::pg_catalog::varchar,
+	/// 	pub field1: super::schema::typ,
+	/// 	pub field2: super::pg_catalog::bool,
+	/// }
+	///
+	/// //base types. the only allowed base types are those in pg_catalog of which all are defined by a simple  typedef like below
+	/// pub type bytea = Vec<u8>;
+	/// pub type int8 = i64;
+	///
+	/// // a domain type, a simple wrapper on another type
+	/// #[derive(Debug, Clone, TryFromRow, ToSql, FromSql)]
+	/// pub struct MyNewType(pub pg_catalog::varchar);
+	///
+	/// // other types can't be converted at the current moment (if the program is called with the debug flag it will print when it comes across something it skips)
+	///
+	/// ```
 	fn to_rust_ast(&self, opt : &Opt) -> Self::Output {
 		use PsqlTypType::*;
 		Some(
@@ -113,7 +150,7 @@ impl ConvertToAst for PsqlType {
 					if self.oid == 2278 {
 						parse_quote!{ pub type #name_type = (); }
 					} else {
-						// println!("	Couldn't convert type: {}, {}", self.name, self.oid);
+						if opt.debug { println!("Couldn't convert type: {}, {}", self.name, self.oid) };
 						return None;
 					}
 				}
@@ -122,6 +159,7 @@ impl ConvertToAst for PsqlType {
 	}
 }
 
+/// creates the syn node for an enum
 fn enum_to_ast_helper(e : &PsqlEnumType, name : &str, _opt : &Opt) ->  Item {
 	let name_type : Type  = syn::parse_str(name).unwrap();
 
@@ -141,6 +179,7 @@ fn enum_to_ast_helper(e : &PsqlEnumType, name : &str, _opt : &Opt) ->  Item {
 	full_enum.into()
 }
 
+/// creates the syn node for a struct
 fn composite_to_ast_helper(c : &PsqlCompositeType, name : &str, _opt : &Opt) ->  Item {
 	let name_type : Type  = syn::parse_str(name).unwrap();
 
@@ -166,7 +205,8 @@ fn composite_to_ast_helper(c : &PsqlCompositeType, name : &str, _opt : &Opt) -> 
 	full_struct.into()
 }
 
-fn base_to_ast_helper(b : &PsqlBaseType, _opt : &Opt) -> Option<Item> {
+/// creates the syn node for a base type (typedef)
+fn base_to_ast_helper(b : &PsqlBaseType, opt : &Opt) -> Option<Item> {
 	let oid_type = match b.oid {
 		16 => return Some(parse_quote!{ pub use bool; }),
 		17 => "Vec<u8>",
@@ -180,7 +220,11 @@ fn base_to_ast_helper(b : &PsqlBaseType, _opt : &Opt) -> Option<Item> {
 		1186 => "Interval",
 		1700 => "Decimal",
 		2278 => "()",
-		_ => return None //format!("\ntype NoRustForSqlType_{} = ();", self.oid)
+		oid => {
+			if opt.debug { println!("No Rust type for postgres type with oid : {}", oid) };
+			//format!("\ntype NoRustForSqlType_{} = ();", self.oid)
+			return None;
+		}
 	};
 	let name_type : Type  = syn::parse_str(&b.name).unwrap();
 	let oid_type : Type = syn::parse_str(oid_type).unwrap();
@@ -188,13 +232,14 @@ fn base_to_ast_helper(b : &PsqlBaseType, _opt : &Opt) -> Option<Item> {
 	Some(parse_quote!{ pub type #name_type = #oid_type; })
 }
 
+/// creates the syn node for a domain (newtype)
 fn domain_to_ast_helper(b : &PsqlDomain, name : &str, _opt : &Opt) ->  Item {
 	let derive_thing : Attribute = parse_quote!{ #[derive(Debug, Clone, TryFromRow, ToSql, FromSql)] };
 	let name_type : Type  = syn::parse_str(name).unwrap();
 	let schema_name : Type = syn::parse_str(&b.base_ns_name).unwrap();
 	let type_name   : Type = syn::parse_str(&b.base_name).unwrap();
 	let mut full_struct : ItemStruct = parse_quote!{
-		pub struct #name_type(#schema_name::#type_name);
+		pub struct #name_type(pub super::#schema_name::#type_name);
 	};
 	full_struct.attrs.push(derive_thing);
 
@@ -205,6 +250,55 @@ fn domain_to_ast_helper(b : &PsqlDomain, name : &str, _opt : &Opt) ->  Item {
 impl ConvertToAst for Vec<SqlProc> {
 	type Output = Vec<Item>;
 
+
+	/// Takes a SQL procedure and turns it into a rust function
+	///
+	/// Implemented on a Vec of SqlProc which contains information on all Procs with the same name
+	///
+	/// ```ignore
+	/// // a non overloaded sql proc
+	/// // the sql string sent to the database
+	/// const MY_FUNCTION_SQL: &str = "SELECT * FROM \"schema\".\"my_function\"($1,$2)";
+	/// // Return struct only generated if the procedure returns an anonymous type
+	/// #[derive(Debug, Clone, TryFromRow, ToSql, FromSql)]
+	/// pub struct my_functionReturn {=
+	/// 	pub field0: super::pg_catalog::varchar,
+	/// 	pub field1: super::schema::typ,
+	/// }
+	/// // fn can be sync as well
+	/// pub async fn my_function(
+	/// 	// client is & is async and &mut if sync (mirrors client's methods between tokio-postgres and postgres)
+	/// 	client: &mut Client,
+	/// 	param0: &super::pg_catalog::varchar,
+	/// 	param1: &super::pg_catalog::varchar,
+	/// // if the function did not return a set the return type would be Result<Option<T>, SqlError> instead
+	/// ) -> Result<Vec<my_functionReturn>, SqlError> {
+	/// 	/* implementation */
+	/// }
+	///
+	/// // an overloaded sql proc
+	/// // called like overloaded_function((client, other_params)) i.e. it takes a single tuple as input
+	/// pub fn overloaded_function<T: 'static + overloaded_function::OverloadTrait>(input: T) -> T::Output {
+	/// 	<T as overloaded_function::OverloadTrait>::tmp(input)
+	/// }
+	/// // A private module with a public trait inside is used to hide implementation details
+	/// mod overloaded_function {
+	/// 	use super::*;
+	/// 	would use #[async_trait] in an async mapping
+	/// 	pub trait OverloadTrait {
+	/// 		type Output;
+	/// 		fn tmp(self) -> Self::Output;
+	/// 	}
+	/// 	const OVERLOAD_FUNCTION0_SQL: &str = "SELECT * FROM \"schema\".\"overloaded_function\"($1)";
+	/// 	impl<'a> OverloadTrait for (&'a mut Client, &'a super::pg_catalog::int4) {
+	/// 		type Output = Result<Option<super::super::pg_catalog::void>, SqlError>;
+	/// 		fn tmp(self) -> Self::Output {
+	/// 			/* implementation */
+	/// 		}
+	/// 	}
+	/// 	//impls for other input params
+	/// }
+	/// ```
 	fn to_rust_ast(&self, opt : &Opt) -> Self::Output {
 		match self.len() {
 			0 => Vec::new(),
@@ -317,7 +411,6 @@ fn to_overload_doc(procs : &[SqlProc]) -> Vec<Attribute> {
 		let ret = parse_quote!{
 			#[doc = #doc_comment]
 		};
-		// println!("{}", ret);
 		ret
 	}).collect()
 }
@@ -348,7 +441,6 @@ fn as_rust_helper(proc : &SqlProc, name : &str, is_overide : bool, opt : &Opt) -
 					pub #field_name : #type_name,
 				}
 			}).collect();
-		// println!();
 		let struct_name : Ident = syn::parse_str(&format!("{}Return", name)).unwrap();
 		let mut full_struct : ItemStruct = parse_quote!{ pub struct #struct_name { #struct_body } };
 		full_struct.attrs.push(derive_thing);
@@ -359,10 +451,15 @@ fn as_rust_helper(proc : &SqlProc, name : &str, is_overide : bool, opt : &Opt) -
 	//get the output type name
 	let ret_type_name = match &proc.outputs {
 		ProcOutput::Existing(t) => {
-			if t == "pg_catalog::record" {
+			if t == "super::pg_catalog::record" {
+				if opt.debug { println!("Cannot make wrapper for procedure {} which returns pg_catalog::record", t) };
 				return Vec::new();
 			} else {
-				t.clone()
+				if is_overide {
+					format!("super::{}", t)
+				} else {
+					t.clone()
+				}
 			}
 		},
 		ProcOutput::NewType(_) => format!("{}Return", name)
@@ -438,6 +535,9 @@ fn as_rust_helper(proc : &SqlProc, name : &str, is_overide : bool, opt : &Opt) -
 
 impl ConvertToAst for SqlProc {
 	type Output = Vec<Item>;
+	/// Generates a rust functions for a non overloaded SQL procedures
+	///
+	/// See the documentation on the impl of ConvertToAst for Vec<SqlProc> foir more information
 	fn to_rust_ast(&self, opt : &Opt) -> Self::Output {
 		as_rust_helper(&self, &self.name, false, opt)
 	}

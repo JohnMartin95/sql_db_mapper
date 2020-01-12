@@ -1,5 +1,5 @@
 use postgres::{Client, Statement};
-use super::db_model::*;
+use super::sql_tree::*;
 use std::collections::{
 	HashMap,
 	hash_map::Entry,
@@ -282,7 +282,7 @@ impl MyClient {
 						}).collect();
 					assert_eq!(type_name.len(), 1);
 					let (nspname,typename) = type_name.remove(0);
-					let full_typ = format!("crate::{}::{}", nspname, typename);
+					let full_typ = format!("super::{}::{}", nspname, typename);
 					ProcOutput::Existing(full_typ)
 				} else {
 					ProcOutput::NewType(outputs)
@@ -341,7 +341,7 @@ impl MyClient {
 				}).collect();
 			assert_eq!(type_name.len(), 1);
 			let (nspname,typename) = type_name.remove(0);
-			let full_typ = format!("crate::{}::{}", nspname, typename);
+			let full_typ = format!("super::{}::{}", nspname, typename);
 
 			match typ_mode as u8 {
 				b'i' => inputs.push(TypeAndName{typ:full_typ, name:arg_name}),
