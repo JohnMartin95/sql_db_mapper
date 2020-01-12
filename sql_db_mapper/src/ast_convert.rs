@@ -151,8 +151,13 @@ fn composite_to_ast_helper(c : &PsqlCompositeType, name : &str, _opt : &Opt) -> 
 			let field_name  : Type = syn::parse_str(&v.name).unwrap();
 			let schema_name : Type = syn::parse_str(&v.type_ns_name).unwrap();
 			let type_name   : Type = syn::parse_str(&v.type_name).unwrap();
+			let typ = if v.not_null {
+				quote!{ super::#schema_name::#type_name }
+			} else {
+				quote!{ Option<super::#schema_name::#type_name> }
+			};
 			parse_quote!{
-				pub #field_name : crate::#schema_name::#type_name,
+				pub #field_name : #typ,
 			}
 		}).collect();
 	let mut full_struct : ItemStruct = parse_quote!{ pub struct #name_type { #struct_body } };
