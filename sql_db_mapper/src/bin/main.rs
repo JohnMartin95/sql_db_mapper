@@ -1,5 +1,5 @@
 use structopt::StructOpt;
-use postgres::{Connection, TlsMode};
+use postgres::{Client, NoTls};
 use std::{
 	fs::File,
 	io::Write
@@ -7,7 +7,6 @@ use std::{
 use sql_db_mapper::{
 	format_rust,
 	connection::*,
-	db_model::*,
 	Opt,
 	VERSION,
 };
@@ -24,7 +23,8 @@ fn main() {
 	let opt = Opt::from_args();
 	println!("{:?}", opt);
 
-	let conn = Connection::connect(opt.conn_string.clone(), TlsMode::None).expect("Failed to connect to database, please check your connection string and try again");
+	let conn = Client::connect(&opt.conn_string, NoTls).expect("Failed to connect to database, please check your connection string and try again");
+
 	if opt.sync {
 		println!(r#"
 [dependencies]
@@ -40,7 +40,7 @@ async-trait = "0.1.22"
 "#, VERSION);
 	}
 
-	let conn = MyConnection::new(&conn);
+	let mut conn = MyClient::new(conn);
 	let full_db = conn.get_all();
 
 	#[cfg(feature = "use_ast")]

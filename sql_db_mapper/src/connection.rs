@@ -1,5 +1,9 @@
-use postgres::{Connection};
+use postgres::{Client, Statement};
 use super::db_model::*;
+use std::collections::{
+	HashMap,
+	hash_map::Entry,
+};
 
 const GET_SCHEMAS : &str =
 "SELECT ns.oid, nspname, nspowner, rolname
@@ -164,18 +168,28 @@ const RUST_KEYWORDS : [&str; 58]= [
 	"yield"
 ];
 
-pub struct MyConnection<'a> {
-	conn : &'a Connection
+pub struct MyClient {
+	client : Client,
+	statements : HashMap<&'static str, Statement>
 }
 //
-impl<'a> MyConnection<'a> {
-	pub fn new(conn:&'a Connection) -> MyConnection<'a> {
-		MyConnection {
-			conn
+impl MyClient {
+	pub fn new(client: Client) -> MyClient {
+		MyClient {
+			client,
+			statements : HashMap::new(),
 		}
 	}
 
-	pub fn get_all(&self) -> FullDB {
+
+	pub fn prepare_cached<'a>(&'a mut self, stmt_str : &'static str) -> Statement {
+		match self.statements.entry(stmt_str) {
+			Entry::Occupied(v) => v.into_mut().clone(),
+			Entry::Vacant(v) => v.insert(self.client.prepare(stmt_str).unwrap()).clone(),
+		}
+	}
+
+	pub fn get_all(&mut self) -> FullDB {
 		let mut full_db = FullDB {schemas : Vec::new()};
 
 		// gets all the schemas in the current db
@@ -197,8 +211,8 @@ impl<'a> MyConnection<'a> {
 		full_db
 	}
 
-	pub fn get_schemas(&self) -> Vec<Schema> {
-		self.conn.query(GET_SCHEMAS, &[])
+	pub fn get_schemas(&mut self) -> Vec<Schema> {
+		self.client.query(GET_SCHEMAS, &[])
 			.unwrap()
 			.into_iter()
 			.map(|row| {
@@ -212,21 +226,21 @@ impl<'a> MyConnection<'a> {
 			}).collect()
 	}
 
-	pub fn get_procedures(&self, schema_id : SchemaId) -> Vec<Vec<SqlProc>> {
-		self.conn
-		.prepare_cached(GET_PROC_NAMES)
-		.unwrap()
-		.query(&[&schema_id])
+	pub fn get_procedures(&mut self, schema_id : SchemaId) -> Vec<Vec<SqlProc>> {
+		let stmt = self.prepare_cached(GET_PROC_NAMES);
+
+		self.client
+		.query(&stmt, &[&schema_id])
 		.unwrap()
 		.into_iter()
 		.map(|v| -> String {
 			v.get(1)
 		})
 		.map(|proc_name| -> Vec<SqlProc> {
-			self.conn
-			.prepare_cached(GET_PROCS)
-			.unwrap()
-			.query(&[&schema_id, &proc_name])
+			let stmt = self.prepare_cached(GET_PROCS);
+
+			self.client
+			.query(&stmt, &[&schema_id, &proc_name])
 			.unwrap()
 			.into_iter()
 			.map(|v| {
@@ -256,10 +270,9 @@ impl<'a> MyConnection<'a> {
 
 				let outputs = if outputs.is_empty() {
 					let ret_type_id : u32 = v.get(6);
-					let mut type_name : Vec<_> = self.conn
-						.prepare_cached(GET_TYPE_NAME)
-						.unwrap()
-						.query(&[&ret_type_id])
+					let stmt = self.prepare_cached(GET_TYPE_NAME);
+					let mut type_name : Vec<_> = self.client
+						.query(&stmt, &[&ret_type_id])
 						.unwrap()
 						.into_iter()
 						.map(|v2| {
@@ -289,7 +302,7 @@ impl<'a> MyConnection<'a> {
 		}).collect()
 	}
 
-	fn get_proc_output_type(&self, all_arg_types : &[u32], arg_modes: &[i8], arg_names : Vec<String>) -> (Vec<TypeAndName>, Vec<TypeAndName>) {
+	fn get_proc_output_type(&mut self, all_arg_types : &[u32], arg_modes: &[i8], arg_names : Vec<String>) -> (Vec<TypeAndName>, Vec<TypeAndName>) {
 		assert_eq!(all_arg_types.len(), arg_modes.len());
 		let arg_names =
 			if all_arg_types.len() != arg_names.len() {
@@ -316,10 +329,9 @@ impl<'a> MyConnection<'a> {
 			let typ_mode = arg_modes[i];
 			let arg_name = arg_names[i].clone();
 
-			let mut type_name : Vec<_> = self.conn
-				.prepare_cached(GET_TYPE_NAME)
-				.unwrap()
-				.query(&[&typ_oid])
+			let stmt = self.prepare_cached(GET_TYPE_NAME);
+			let mut type_name : Vec<_> = self.client
+				.query(&stmt, &[&typ_oid])
 				.unwrap()
 				.into_iter()
 				.map(|v2| {
@@ -340,12 +352,12 @@ impl<'a> MyConnection<'a> {
 		(inputs, outputs)
 	}
 
-	pub fn get_types(&self, schema_id : SchemaId) -> Vec<PsqlType>{
+	pub fn get_types(&mut self, schema_id : SchemaId) -> Vec<PsqlType>{
 		let ns_oid = schema_id;
-		self.conn
-		.prepare_cached(GET_TYPES)
-		.unwrap()
-		.query(&[&ns_oid])
+		let stmt = self.prepare_cached(GET_TYPES);
+
+		self.client
+		.query(&stmt, &[&ns_oid])
 		.unwrap()
 		.into_iter()
 		.map(|v| {
@@ -382,11 +394,11 @@ impl<'a> MyConnection<'a> {
 		}).collect()
 	}
 
-	fn get_domain_base(&self, oid : u32) -> PsqlDomain{
-		self.conn
-		.prepare_cached(GET_DOMAIN_BASE)
-		.unwrap()
-		.query(&[&oid])
+	fn get_domain_base(&mut self, oid : u32) -> PsqlDomain{
+		let stmt = self.prepare_cached(GET_DOMAIN_BASE);
+
+		self.client
+		.query(&stmt, &[&oid])
 		.unwrap()
 		.into_iter()
 		.map(|v| {
@@ -400,11 +412,11 @@ impl<'a> MyConnection<'a> {
 
 	}
 
-	pub fn get_columns(&self, rel_id : u32) -> Vec<Column>{
-		self.conn
-		.prepare_cached(GET_COLUMNS)
-		.unwrap()
-		.query(&[&rel_id])
+	pub fn get_columns(&mut self, rel_id : u32) -> Vec<Column>{
+		let stmt = self.prepare_cached(GET_COLUMNS);
+
+		self.client
+		.query(&stmt, &[&rel_id])
 		.unwrap()
 		.into_iter()
 		.map(|v| {
@@ -419,11 +431,11 @@ impl<'a> MyConnection<'a> {
 		}).collect()
 	}
 
-	fn get_enum_labels(&self, type_id:u32) -> Vec<String> {
-		self.conn
-		.prepare_cached(GET_ENUM)
-		.unwrap()
-		.query(&[&type_id])
+	fn get_enum_labels(&mut self, type_id:u32) -> Vec<String> {
+		let stmt = self.prepare_cached(GET_ENUM);
+
+		self.client
+		.query(&stmt, &[&type_id])
 		.unwrap()
 		.into_iter()
 		.map(|v| {

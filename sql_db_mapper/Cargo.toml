@@ -9,7 +9,7 @@ documentation = "https://docs.rs/sql_db_mapper/"
 edition = "2018"
 
 [dependencies]
-postgres = {version = "0.15", features = ["with-chrono"] }
+postgres  = { version = "0.17", features = ["with-chrono-0_4"] }
 syn = { version = "1.0", features = ["full"], optional = true }
 quote = { version = "1.0.2", optional = true }
 proc-macro2 = { version = "1.0.7", optional = true }
