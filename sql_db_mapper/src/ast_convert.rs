@@ -1,7 +1,11 @@
-use super::sql_tree::*;
+use super::{
+	sql_tree::*,
+	Opt,
+};
 use syn::*;
 use quote::{
 	ToTokens,
+	quote,
 };
 use proc_macro2::{
 	Span,
@@ -21,17 +25,17 @@ impl<T, A: Extend<T>> MyExtend<T> for A {
 
 pub trait ConvertToAst {
 	type Output;
-	fn to_rust_ast(&self) -> Self::Output;
+	fn to_rust_ast(&self, opt : &Opt) -> Self::Output;
 
-	fn as_string(&self) -> String
+	fn as_string(&self, opt : &Opt) -> String
 	where Self::Output : ToTokens {
-		self.to_rust_ast().to_token_stream().to_string()
+		self.to_rust_ast(opt).to_token_stream().to_string()
 	}
 }
 
 impl ConvertToAst for FullDB {
 	type Output = File;
-	/** Output structure
+	/** Turn a full database structure into a single rust file mapping all it's types and functions
 
 	```ignore
 	#![allow(non_snake_case)]
@@ -43,10 +47,9 @@ impl ConvertToAst for FullDB {
 	};
 	use orm::*;
 
-
 	//code for each schema here
 	``` */
-	fn to_rust_ast(&self) -> Self::Output {
+	fn to_rust_ast(&self, opt : &Opt) -> Self::Output {
 		File {
 			shebang: None,
 			attrs: vec![
@@ -58,7 +61,7 @@ impl ConvertToAst for FullDB {
 				parse_quote!{ pub use sql_db_mapper_core as orm; },
 				parse_quote!{ use orm::*; },
 			].extend2(
-				self.schemas.iter().map(ConvertToAst::to_rust_ast).map(Item::Mod)
+				self.schemas.iter().map(|v| v.to_rust_ast(opt)).map(Item::Mod)
 			),
 		}
 	}
@@ -67,23 +70,23 @@ impl ConvertToAst for FullDB {
 impl ConvertToAst for Schema {
 	type Output = ItemMod;
 
-	/** Output structure
+	/** Renders a schema as a rust module
 
 	```ignore
 	mod #schema_name {
 		use super::*;
 
-		//code for all types and other types
+		//code for all tables and other types
 
 		//code for each procedures/function
 	}
 	``` */
-	fn to_rust_ast(&self) -> Self::Output {
+	fn to_rust_ast(&self, opt : &Opt) -> Self::Output {
 		let name = Ident::new(&self.name, Span::call_site());
 		let content : TokenStream =
-			self.types.iter().map(ConvertToAst::to_rust_ast)
+			self.types.iter().map(|v| v.to_rust_ast(opt))
 			.flatten()
-			.chain(self.procs.iter().map(ConvertToAst::to_rust_ast).flatten())
+			.chain(self.procs.iter().map(|v| v.to_rust_ast(opt)).flatten())
 			.map(|v| v.to_token_stream()).collect();
 		parse_quote!{
 			pub mod #name {
@@ -97,15 +100,15 @@ impl ConvertToAst for Schema {
 impl ConvertToAst for PsqlType {
 	type Output = Option<Item>;
 
-	fn to_rust_ast(&self) -> Self::Output {
+	fn to_rust_ast(&self, opt : &Opt) -> Self::Output {
 		use PsqlTypType::*;
 		Some(
 			match &self.typ {
-				Enum(e) => enum_to_ast_helper(e, &self.name),
-				Composite(c) => composite_to_ast_helper(c, &self.name),
-				Base(b) => return base_to_ast_helper(b),
-				Domain(d) => domain_to_ast_helper(d, &self.name),
-				Other => {
+				Enum(e)      => enum_to_ast_helper(e, &self.name, opt),
+				Composite(c) => composite_to_ast_helper(c, &self.name, opt),
+				Base(b)      => base_to_ast_helper(b, opt)?,
+				Domain(d)    => domain_to_ast_helper(d, &self.name, opt),
+				Other        => {
 					let name_type : Type  = syn::parse_str(&self.name).unwrap();
 					if self.oid == 2278 {
 						parse_quote!{ pub type #name_type = (); }
@@ -119,7 +122,7 @@ impl ConvertToAst for PsqlType {
 	}
 }
 
-fn enum_to_ast_helper(e : &PsqlEnumType, name : &str) ->  Item {
+fn enum_to_ast_helper(e : &PsqlEnumType, name : &str, _opt : &Opt) ->  Item {
 	let name_type : Type  = syn::parse_str(name).unwrap();
 
 	//the enum definition itself
@@ -138,7 +141,7 @@ fn enum_to_ast_helper(e : &PsqlEnumType, name : &str) ->  Item {
 	full_enum.into()
 }
 
-fn composite_to_ast_helper(c : &PsqlCompositeType, name : &str) ->  Item {
+fn composite_to_ast_helper(c : &PsqlCompositeType, name : &str, _opt : &Opt) ->  Item {
 	let name_type : Type  = syn::parse_str(name).unwrap();
 
 	let derive_thing : Attribute = parse_quote!{ #[derive(Debug, Clone, TryFromRow, ToSql, FromSql)] };
@@ -158,7 +161,7 @@ fn composite_to_ast_helper(c : &PsqlCompositeType, name : &str) ->  Item {
 	full_struct.into()
 }
 
-fn base_to_ast_helper(b : &PsqlBaseType) -> Option<Item> {
+fn base_to_ast_helper(b : &PsqlBaseType, _opt : &Opt) -> Option<Item> {
 	let oid_type = match b.oid {
 		16 => return Some(parse_quote!{ pub use bool; }),
 		17 => "Vec<u8>",
@@ -180,7 +183,7 @@ fn base_to_ast_helper(b : &PsqlBaseType) -> Option<Item> {
 	Some(parse_quote!{ pub type #name_type = #oid_type; })
 }
 
-fn domain_to_ast_helper(b : &PsqlDomain, name : &str) ->  Item {
+fn domain_to_ast_helper(b : &PsqlDomain, name : &str, _opt : &Opt) ->  Item {
 	let derive_thing : Attribute = parse_quote!{ #[derive(Debug, Clone, TryFromRow, ToSql, FromSql)] };
 	let name_type : Type  = syn::parse_str(name).unwrap();
 	let schema_name : Type = syn::parse_str(&b.base_ns_name).unwrap();
@@ -197,13 +200,13 @@ fn domain_to_ast_helper(b : &PsqlDomain, name : &str) ->  Item {
 impl ConvertToAst for Vec<SqlProc> {
 	type Output = Vec<Item>;
 
-	fn to_rust_ast(&self) -> Self::Output {
+	fn to_rust_ast(&self, opt : &Opt) -> Self::Output {
 		match self.len() {
 			0 => Vec::new(),
-			1 => self[0].to_rust_ast(),
+			1 => self[0].to_rust_ast(opt),
 			_ => {
 				let name_type : Type  = syn::parse_str(&self[0].name).unwrap();
-				let trait_impls : TokenStream = self.iter().enumerate().map(|(i,p)| to_trait_impl(i,p)).collect();
+				let trait_impls : TokenStream = self.iter().enumerate().map(|(i,p)| to_trait_impl(i,p, opt)).collect();
 				let doc_comments = to_overload_doc(&self);
 				let mut fn_docs = vec![
 					parse_quote!{#[doc = "This is an overloaded SQL function, it takes one tuple parameter."]},
@@ -212,21 +215,41 @@ impl ConvertToAst for Vec<SqlProc> {
 				];
 				fn_docs.extend(doc_comments);
 
+				// output type depending on wether the code is async
+				let output_type = if opt.sync {
+					quote!{ T::Output }
+				} else {
+					quote!{ impl Future<Output = T::Output> }
+				};
+
 				let mut fn_code : ItemFn = parse_quote!{
-					pub fn #name_type<T:'static + #name_type::OverloadTrait>(input : T) -> impl Future<Output = T::Output> {
+					pub fn #name_type<T:'static + #name_type::OverloadTrait>(input : T) -> #output_type {
 						<T as #name_type::OverloadTrait>::tmp(input)
 					}
 				};
 				fn_code.attrs.extend(fn_docs);
+				let (is_async_trait, async_fn) = if opt.sync {
+					(
+						quote!{ },
+						quote!{ },
+					)
+				} else {
+					(
+						quote!{
+							use async_trait::async_trait;
+							#[async_trait]
+						},
+						quote!{ async },
+					)
+				};
 
 				let mod_with_impls : ItemMod = parse_quote!{
 					mod #name_type {
-						use async_trait::async_trait;
 						use super::*;
-						#[async_trait]
+						#is_async_trait
 						pub trait OverloadTrait {
 							type Output;
-							async fn tmp(self) -> Self::Output;
+							#async_fn fn tmp(self) -> Self::Output;
 						}
 						#trait_impls
 					}
@@ -241,14 +264,18 @@ impl ConvertToAst for Vec<SqlProc> {
 	}
 }
 
-fn to_trait_impl(index : usize, proc : &SqlProc) -> TokenStream {
+fn to_trait_impl(index : usize, proc : &SqlProc, opt : &Opt) -> TokenStream {
 	//build SQL string to call proc
 	let new_name = format!("{}{}", proc.name, index);
-	as_rust_helper(proc, &new_name, true,)
+	as_rust_helper(proc, &new_name, true, opt)
 		.iter().map(|v| v.to_token_stream()).collect()
 }
-fn to_tuple_type(types : &[TypeAndName]) -> Type {
-	let mut ret = String::from("(&'a Client, ");
+fn to_tuple_type(types : &[TypeAndName], opt : &Opt) -> Type {
+	let mut ret = if opt.sync {
+		String::from("(&'a mut Client, ")
+	} else {
+		String::from("(&'a Client, ")
+	};
 	for tan in types {
 		ret += "&'a ";
 		ret += &tan.typ;
@@ -291,7 +318,7 @@ fn to_overload_doc(procs : &[SqlProc]) -> Vec<Attribute> {
 }
 
 
-fn as_rust_helper(proc : &SqlProc, name : &str, is_overide : bool) -> Vec<Item> {
+fn as_rust_helper(proc : &SqlProc, name : &str, is_overide : bool, opt : &Opt) -> Vec<Item> {
 	let name_type : Type  = syn::parse_str(name).unwrap();
 
 	//build SQL string to call proc
@@ -346,21 +373,28 @@ fn as_rust_helper(proc : &SqlProc, name : &str, is_overide : bool) -> Vec<Item> 
 
 	let func_params : TokenStream = proc.inputs.as_function_params();
 	let query_params : TokenStream = as_query_params(&proc.inputs);
+
+	let (opt_async, opt_await, is_async_trait, client_type) = if opt.sync {
+		(quote!{  }, quote!{  }, quote!{  }, quote!{ &mut Client })
+	} else {
+		(quote!{ async }, quote!{ .await }, quote!{ #[async_trait] }, quote!{ &Client })
+	};
+
 	//the body of the function
-	let async_body : TokenStream = if proc.returns_set {
+	let body : TokenStream = if proc.returns_set {
 		parse_quote!{
-			let stmt = client.prepare(#call_string_name).await?;
+			let stmt = client.prepare(#call_string_name)#opt_await?;
 			client
-				.query(&stmt, &[#query_params]).await?
+				.query(&stmt, &[#query_params])#opt_await?
 				.into_iter()
 				.map(#ret_type_name::from_row)
 				.collect()
 		}
 	} else {
 		parse_quote!{
-			let stmt = client.prepare(#call_string_name).await?;
+			let stmt = client.prepare(#call_string_name)#opt_await?;
 			Ok(client
-				.query_opt(&stmt, &[#query_params]).await?
+				.query_opt(&stmt, &[#query_params])#opt_await?
 				.map(#ret_type_name::from_row)
 				.transpose()?
 			)
@@ -369,25 +403,25 @@ fn as_rust_helper(proc : &SqlProc, name : &str, is_overide : bool) -> Vec<Item> 
 	//the wrappings on the body
 	let func_text : Item =
 	if is_overide {
-		let tuple_type : Type = to_tuple_type(&proc.inputs);
+		let tuple_type : Type = to_tuple_type(&proc.inputs, opt);
 		let tuple_pattern : TokenStream = to_tuple_pattern(&proc.inputs);
 		parse_quote!{
-			#[async_trait]
+			#is_async_trait
 			impl<'a> OverloadTrait for #tuple_type {
 				type Output = Result<#new_ret_type_name, SqlError>;
-				async fn tmp(self) -> Self::Output {
+				#opt_async fn tmp(self) -> Self::Output {
 					let #tuple_pattern = self;
-					#async_body
+					#body
 				}
 			}
 		}
 	} else {
 		parse_quote!{
-			pub async fn #name_type(
-				client : &Client,
+			pub #opt_async fn #name_type(
+				client : #client_type,
 				#func_params
 			) -> Result<#new_ret_type_name, SqlError> {
-				#async_body
+				#body
 			}
 		}
 	};
@@ -399,8 +433,8 @@ fn as_rust_helper(proc : &SqlProc, name : &str, is_overide : bool) -> Vec<Item> 
 
 impl ConvertToAst for SqlProc {
 	type Output = Vec<Item>;
-	fn to_rust_ast(&self) -> Self::Output {
-		as_rust_helper(&self, &self.name, false)
+	fn to_rust_ast(&self, opt : &Opt) -> Self::Output {
+		as_rust_helper(&self, &self.name, false, opt)
 	}
 }
 

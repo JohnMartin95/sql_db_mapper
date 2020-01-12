@@ -175,6 +175,28 @@ impl<'a> MyConnection<'a> {
 		}
 	}
 
+	pub fn get_all(&self) -> FullDB {
+		let mut full_db = FullDB {schemas : Vec::new()};
+
+		// gets all the schemas in the current db
+		let schemas = self.get_schemas();
+
+		for mut schema in schemas {
+			//get all types and tables
+			let types = self.get_types(schema.id);
+			for typ in types {
+				schema.add_type(typ);
+			}
+			//get all stored procedures/functions
+			let procs = self.get_procedures(schema.id);
+			schema.append(procs);
+
+			//add everything to the schema object
+			full_db.add_schema(schema);
+		}
+		full_db
+	}
+
 	pub fn get_schemas(&self) -> Vec<Schema> {
 		self.conn.query(GET_SCHEMAS, &[])
 			.unwrap()

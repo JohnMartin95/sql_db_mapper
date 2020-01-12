@@ -13,8 +13,10 @@ postgres = {version = "0.15", features = ["with-chrono"] }
 syn = { version = "1.0", features = ["full"], optional = true }
 quote = { version = "1.0.2", optional = true }
 proc-macro2 = { version = "1.0.7", optional = true }
+structopt = "0.3"
 
 [features]
+default = ["use_ast"]
 use_ast = ["proc-macro2", "quote", "syn"]
 
 [lib]

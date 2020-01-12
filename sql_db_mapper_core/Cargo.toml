@@ -7,15 +7,27 @@ description = "Maps a SQL database to rust structs and functions"
 repository = "https://github.com/JohnMartin95/sql_db_mapper"
 documentation = "https://docs.rs/sql_db_mapper/"
 edition = "2018"
+#sql_db_mapper_derive must be published first
+publish = false
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+# async dependencies, though tokio-postgres would be in the dependency tree regardless
 tokio-postgres = { version = "0.5.1", features = ["with-chrono-0_4"] }
+async-trait = { version = "0.1.22" }
+# sync dependency
+postgres  = { version = "0.17", features = ["with-chrono-0_4"], optional = true }
+# general postgre dependencies
 postgres-types = { version = "0.1.0" }
-sql_db_mapper_derive = { path = "../sql_db_mapper_derive" }
-async-trait = "0.1.22"
 postgres-derive = "0.4"
+# todo and this line must change
+sql_db_mapper_derive = { path = "../sql_db_mapper_derive" }
+# helpful types
 rust_decimal = { version = "1.1", features = ["postgres"] }
 chrono = "0.4"
 bytes = "0.5"
+
+
+[features]
+sync = ["postgres"]

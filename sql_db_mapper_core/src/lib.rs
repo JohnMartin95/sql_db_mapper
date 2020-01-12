@@ -2,8 +2,23 @@
 
 
 /// Contains and reexports types that callers of the wrapped db would need to use it
-
+#[cfg(not(feature = "sync"))]
 pub use tokio_postgres::{
+	Client,
+	Error as SqlError,
+	row::Row,
+};
+
+#[cfg(not(feature = "sync"))]
+#[allow(unused_imports)]
+#[macro_use]
+extern crate async_trait;
+#[cfg(not(feature = "sync"))]
+#[doc(hidden)]
+pub use async_trait::*;
+
+#[cfg(feature = "sync")]
+pub use postgres::{
 	Client,
 	Error as SqlError,
 	row::Row,
@@ -40,11 +55,6 @@ pub use sql_db_mapper_derive::*;
 // #[doc(hidden)]
 pub use postgres_derive::*;
 
-// #[allow(unused_imports)]
-// #[macro_use]
-// extern crate async_trait;
-// #[doc(hidden)]
-pub use async_trait::*;
 
 
 pub trait TryFromRow: Sized {

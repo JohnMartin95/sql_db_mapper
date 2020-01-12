@@ -10,6 +10,40 @@ mod sql_tree;
 pub mod ast_convert;
 
 
+pub const VERSION: &str = std::env!("CARGO_PKG_VERSION");
+
+use structopt::StructOpt;
+use std::path::PathBuf;
+
+#[derive(Debug, StructOpt)]
+#[structopt(
+	name = "sql_db_mapper",
+	about = "Generate a rust wrapper for a PostgreSQL database",
+	version = VERSION,
+	author = "John Martin <johnmartin1225+rust@gmail.com>"
+)]
+pub struct Opt {
+	/// Activate debug mode
+	#[structopt(short, long)]
+	pub debug: bool,
+
+	/// Generate syncronous wrapper
+	#[structopt(short, long)]
+	pub sync: bool,
+
+	/// Skip running output through rustfmt
+	#[structopt(short, long)]
+	pub ugly: bool,
+
+	/// String to connect to database, see tokio_postgres::Config for details
+	#[structopt()]
+	pub conn_string: String,
+
+	/// Output file, stdout if not present
+	#[structopt(parse(from_os_str))]
+	pub output: Option<PathBuf>,
+}
+
 pub fn format_rust(value: &str) -> String {
 	use std::{
 		process::{
