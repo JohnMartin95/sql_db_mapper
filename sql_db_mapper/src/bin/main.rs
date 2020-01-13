@@ -15,7 +15,6 @@ use sql_db_mapper::ast_convert::*;
 
 fn main() {
 	let opt = Opt::from_args();
-	println!("{:?}", opt);
 
 	let conn = Client::connect(&opt.conn_string, NoTls).expect("Failed to connect to database, please check your connection string and try again");
 

@@ -20,15 +20,14 @@ use std::path::PathBuf;
 #[structopt(
 	name = "sql_db_mapper",
 	about = "Generate a rust wrapper for a PostgreSQL database",
-	version = VERSION,
-	author = "John Martin <johnmartin1225+rust@gmail.com>"
+	version = VERSION
 )]
 pub struct Opt {
 	/// Activate debug mode
 	#[structopt(short, long)]
 	pub debug: bool,
 
-	/// Generate syncronous wrapper
+	/// Generate synchronous mapping
 	#[structopt(short, long)]
 	pub sync: bool,
 

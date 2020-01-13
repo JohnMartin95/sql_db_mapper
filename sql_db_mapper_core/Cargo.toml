@@ -5,7 +5,7 @@ authors = ["John Martin <johnmartin1225+rust@gmail.com>"]
 license = "MIT OR Apache-2.0"
 description = "Maps a SQL database to rust structs and functions"
 repository = "https://github.com/JohnMartin95/sql_db_mapper"
-documentation = "https://docs.rs/sql_db_mapper/"
+documentation = "https://docs.rs/sql_db_mapper_core/"
 edition = "2018"
 #sql_db_mapper_derive must be published first
 publish = false
@@ -22,7 +22,7 @@ postgres  = { version = "0.17", features = ["with-chrono-0_4"], optional = true 
 postgres-types = { version = "0.1.0" }
 postgres-derive = "0.4"
 # todo and this line must change
-sql_db_mapper_derive = { path = "../sql_db_mapper_derive" }
+sql_db_mapper_derive = { path = "../sql_db_mapper_derive", version = "0.0.2" }
 # helpful types
 rust_decimal = { version = "1.1", features = ["postgres"] }
 chrono = "0.4"
