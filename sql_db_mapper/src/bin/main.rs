@@ -8,7 +8,6 @@ use sql_db_mapper::{
 	format_rust,
 	connection::*,
 	Opt,
-	VERSION,
 };
 
 use sql_db_mapper::ast_convert::*;
@@ -21,16 +20,16 @@ fn main() {
 	if opt.sync {
 		println!(r#"
 [dependencies]
-sql_db_mapper_core = {{ version = "{}", features=["sync"] }}
+sql_db_mapper_core = {{ version = "0.0.2", features=["sync"] }}
 postgres-types = "0.1"
-"#, VERSION);
+"#);
 	} else {
 		println!(r#"
 [dependencies]
-sql_db_mapper_core = "{}"
+sql_db_mapper_core = "0.0.2"
 postgres-types = "0.1"
 async-trait = "0.1.22"
-"#, VERSION);
+"#);
 	}
 
 	let mut conn = MyClient::new(conn);

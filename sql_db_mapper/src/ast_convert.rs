@@ -278,7 +278,7 @@ impl ConvertToAst for Vec<SqlProc> {
 	///
 	/// // an overloaded sql proc
 	/// // called like overloaded_function((client, other_params)) i.e. it takes a single tuple as input
-	/// pub fn overloaded_function<T: 'static + overloaded_function::OverloadTrait>(input: T) -> T::Output {
+	/// pub fn overloaded_function<T: overloaded_function::OverloadTrait>(input: T) -> T::Output {
 	/// 	<T as overloaded_function::OverloadTrait>::tmp(input)
 	/// }
 	/// // A private module with a public trait inside is used to hide implementation details
@@ -315,18 +315,23 @@ impl ConvertToAst for Vec<SqlProc> {
 				fn_docs.extend(doc_comments);
 
 				// output type depending on wether the code is async
-				let output_type = if opt.sync {
-					quote!{ T::Output }
+				let mut fn_code : ItemFn = if opt.sync {
+					parse_quote!{
+						pub fn #name_type<T:#name_type::OverloadTrait>(input : T) -> T::Output {
+							<T as #name_type::OverloadTrait>::tmp(input)
+						}
+					}
 				} else {
-					quote!{ impl Future<Output = T::Output> }
-				};
-
-				let mut fn_code : ItemFn = parse_quote!{
-					pub fn #name_type<T:'static + #name_type::OverloadTrait>(input : T) -> #output_type {
-						<T as #name_type::OverloadTrait>::tmp(input)
+					parse_quote!{
+						pub fn #name_type<T:#name_type::OverloadTrait>(input : T) -> impl Future<Output = T::Output> {
+							async {
+								<T as #name_type::OverloadTrait>::tmp(input).await
+							}
+						}
 					}
 				};
 				fn_code.attrs.extend(fn_docs);
+
 				let (is_async_trait, async_fn) = if opt.sync {
 					(
 						quote!{ },

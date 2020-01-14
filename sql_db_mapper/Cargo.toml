@@ -1,6 +1,6 @@
 [package]
 name = "sql_db_mapper"
-version = "0.0.2"
+version = "0.0.3"
 authors = ["John Martin <johnmartin1225+rust@gmail.com>"]
 license = "MIT OR Apache-2.0"
 description = "Maps a SQL database to rust structs and functions"

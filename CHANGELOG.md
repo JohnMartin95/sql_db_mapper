@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## 0.0.3 - 2020-01-13
+
+### Fixed
+- Overloaded function mapping no longer have 'static lifetime requirement
+
 ## 0.0.2 - 2020-01-13
 
 ### Added
@@ -18,7 +23,6 @@ All notable changes to this project will be documented in this file.
 - Reexports needed in generated code are moved from sql_db_mapper to the new sql_db_mapper_core
 - Trait to convert `Row`s to a type now in sql_db_mapper_core rather than generated
 - Backend of code generation moved from `format!`ing strings to syn, proc_macro2, and quote
-
 
 ### Fixed
 - Nullable columns now correctly mapped to Option<T>
