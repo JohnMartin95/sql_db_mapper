@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 ### Added
 - Option use_tuples which allows for mapping only overloaded procs to take one tuple, all procs to take tuples, skip mapping overloaded procs at all, and only mapping the first defined of the overloaded procs
 - Option for generated types to derive serde Serialize and Deserialize
+- Option for generating mapping as a whole crate directory
 
 ### Changed
 - Backend of code generation no long uses syn Node instead keeping everything in quote generated TokenStreams

@@ -4,6 +4,7 @@ use super::{
 	sql_tree::*,
 	Opt,
 	Tuples,
+	format_rust,
 };
 use quote::{
 	quote,
@@ -33,6 +34,15 @@ pub trait ConvertToAst {
 	fn as_string(&self, opt : &Opt) -> String  {
 		self.to_rust_tokens(opt).to_string()
 	}
+
+	fn maybe_formatted(&self, opt : &Opt) ->  String {
+		let output = self.as_string(opt);
+		if opt.ugly {
+			output
+		} else {
+			format_rust(&output)
+		}
+	}
 }
 
 impl ConvertToAst for FullDB {
@@ -54,13 +64,18 @@ impl ConvertToAst for FullDB {
 	fn to_rust_tokens(&self, opt : &Opt)-> TokenStream {
 		let schemas = self.schemas.iter().map(|v| {
 			let name = format_ident!("{}", v.name);
-			let schema_def = v.to_rust_tokens(opt);
-			quote!{
-				pub mod #name {
-					#schema_def
+			if opt.dir {
+				quote!{
+					pub mod #name;
+				}
+			} else {
+				let schema_def = v.to_rust_tokens(opt);
+				quote!{
+					pub mod #name {
+						#schema_def
+					}
 				}
 			}
-
 		});
 
 		quote!{
@@ -70,6 +85,54 @@ impl ConvertToAst for FullDB {
 			pub use sql_db_mapper_core as orm;
 			use orm::*;
 			#(#schemas)*
+		}
+	}
+}
+impl FullDB {
+	//writes the output text to either
+	pub fn make_output(&self, opt : &Opt) {
+		use std::{
+			fs::File,
+			io::Write
+		};
+		let toml_content = opt.get_cargo_toml();
+		if let Some(output_file) = &opt.output {
+			let mut output_file = output_file.clone();
+			if opt.dir {
+				//create crate directory
+				std::fs::create_dir_all(&output_file).unwrap();
+
+				//generate Cargo.toml
+				let mut toml_path = output_file.clone();
+				toml_path.push("Cargo.toml");
+				let mut cargo_toml = File::create(toml_path).unwrap();
+				cargo_toml.write_all(toml_content.as_bytes()).expect("failed to write to file");
+
+				//generate src directory
+				output_file.push("src/");
+				std::fs::create_dir_all(&output_file).unwrap();
+
+				//generate lib.rs file
+				let mut lib_rs = output_file.clone();
+				lib_rs.push("lib.rs");
+				let mut lib_rs = File::create(lib_rs).unwrap();
+				lib_rs.write_all(self.maybe_formatted(&opt).as_bytes()).expect("failed to write to file");
+
+				// make file for each schema's module
+				for schema in &self.schemas {
+					let mut schema_rs = output_file.clone();
+					schema_rs.push(format!("{}.rs", schema.name));
+					let mut schema_rs = File::create(schema_rs).unwrap();
+					schema_rs.write_all(schema.maybe_formatted(&opt).as_bytes()).expect("failed to write to file");
+				}
+			} else {
+				println!("{}\n", toml_content);
+				let mut f = File::create(output_file).unwrap();
+				f.write_all(self.maybe_formatted(&opt).as_bytes()).expect("failed to write to file");
+			}
+		} else {
+			println!("{}\n", toml_content);
+			println!("{}", self.maybe_formatted(&opt));
 		}
 	}
 }

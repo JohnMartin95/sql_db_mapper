@@ -32,6 +32,10 @@ pub struct Opt {
 	#[structopt(long)]
 	pub serde: bool,
 
+	/// Program will treat output as a directory name rather than a file and generate a whole crate. If output is not provided code is printed as usual
+	#[structopt(long)]
+	pub dir: bool,
+
 	/// How to use tuples (used by default for just overloads). Options:
 	/// overloads (the default, use tuples to represent function overloading).
 	/// all (Have all functions take a tuple for consitency).
@@ -66,6 +70,44 @@ impl std::str::FromStr for Tuples {
 			"one_overload" => Ok(Tuples::OldestOverload),
 			_ => Err("Invalid tuple handling option"),
 		}
+	}
+}
+
+impl Opt {
+	pub fn get_cargo_toml(&self) -> String {
+		let package_name =
+		if let Some(output_file) = &self.output {
+			// let mut output_file = output_file.clone();
+			if let Some(name) = output_file.file_name() {
+				if let Some(name) = name.to_str() {
+					String::from(name)
+				} else {
+					String::from("my_db_mapping")
+				}
+			} else {
+				String::from("my_db_mapping")
+			}
+		} else {
+			String::from("my_db_mapping")
+		};
+
+		let mut dependencies = format!("[package]\nname = \"{}\"\nversion = \"0.1.0\"\nedition = \"2018\"\n\n[dependencies]\npostgres-types = \"0.1\"\n", package_name);
+
+		if !self.sync {
+			dependencies += "async-trait = \"0.1.22\"\n";
+		}
+		if self.serde {
+			dependencies += "serde = { version = \"1.0\", features = [\"derive\"] }\n";
+		}
+
+		dependencies +=
+		match (self.sync, self.serde) {
+			(true,  true ) => "sql_db_mapper_core = { version = \"0.0.2\", features=[\"sync\", \"with_serde\"] }\n",
+			(true,  false) => "sql_db_mapper_core = { version = \"0.0.2\", features=[\"sync\"] }\n",
+			(false, true ) => "sql_db_mapper_core = { version = \"0.0.2\", features=[\"with_serde\"] }\n",
+			(false, false) => "sql_db_mapper_core = \"0.0.2\"\n",
+		};
+		dependencies
 	}
 }
 
