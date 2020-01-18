@@ -28,6 +28,14 @@ pub struct Opt {
 	#[structopt(short, long)]
 	pub ugly: bool,
 
+	/// How to use tuples (used by default for just overloads). Options:
+	/// overloads (the default, use tuples to represent function overloading).
+	/// all (Have all functions take a tuple for consitency).
+	/// none (skip mapping overloaded procs at all).
+	/// one_overload (avoid tuples by only mapping the oldest sql proc in the database).
+	#[structopt(long, default_value = "overloads")]
+	pub use_tuples : Tuples,
+
 	/// String to connect to database, see tokio_postgres::Config for details
 	#[structopt()]
 	pub conn_string: String,
@@ -35,6 +43,26 @@ pub struct Opt {
 	/// Output file, stdout if not present
 	#[structopt(parse(from_os_str))]
 	pub output: Option<PathBuf>,
+}
+#[derive(Debug, StructOpt, Clone, Copy)]
+pub enum Tuples {
+	ForOverloads,
+	ForAll,
+	NoOverloads,
+	OldestOverload,
+}
+impl std::str::FromStr for Tuples {
+	type Err = &'static str;
+
+	fn from_str(s: &str) -> Result<Tuples,  &'static str> {
+		match s {
+			"overloads"    => Ok(Tuples::ForOverloads),
+			"all"          => Ok(Tuples::ForAll),
+			"none"         => Ok(Tuples::NoOverloads),
+			"one_overload" => Ok(Tuples::OldestOverload),
+			_ => Err("Invalid tuple handling option"),
+		}
+	}
 }
 
 /// Calls rustfmt (the program) on the input

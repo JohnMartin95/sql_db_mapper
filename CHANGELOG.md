@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## 0.0.4 - 2020-01-18
+
+### Added
+- Option use_tuples which allows for mapping only overloaded procs to take one tuple, all procs to take tuples, skip mapping overloaded procs at all, and only mapping the first defined of the overloaded procs
+
+### Changed
+- Backend of code generation no long uses syn Node instead keeping everything in quote generated TokenStreams
+
 ## 0.0.3 - 2020-01-13
 
 ### Fixed

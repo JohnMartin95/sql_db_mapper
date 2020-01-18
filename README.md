@@ -41,11 +41,10 @@ Features a derive macro from TryFromRow (defined in sql_db_mapper_core) which pr
 ### Future Work
 * more options relating to how the code is generated
 	* derives that may be wanted (serde comes to mind)
-	* add option for all generated functions to take a tuple to avoid client breaking changes noted above
 	* a derive or other proc_macro version of the code. It may not be recommended for compile time reasons but perhaps somebody would appreciate it
 	* generate a whole (properly-structured) crate wrapping the database rather than one file and printing the dependencies to the console
-	* increasing performance
 	* use heck to allow names to be mapped to appropriate rust equivalents
+	* Grab text from `COMMENT ON` and stick it in doc comments
 * consider adding support for other popular databases as well
 	* either through connecting to the database as is being currently done or possibly by parsing SQL itself
 

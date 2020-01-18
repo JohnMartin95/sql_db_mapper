@@ -3,6 +3,7 @@
 use super::{
 	sql_tree::*,
 	Opt,
+	Tuples,
 };
 use quote::{
 	quote,
@@ -286,68 +287,92 @@ impl ConvertToAst for Vec<SqlProc> {
 	/// }
 	/// ```
 	fn to_rust_tokens(&self, opt : &Opt) -> TokenStream {
-		match self.len() {
-			0 => quote!{  },
-			1 => self[0].to_rust_tokens(opt),
-			_ => {
-				let name_type  = format_ident!("{}", &self[0].name);
-				let doc_comments = to_overload_doc(&self);
-				let fn_docs = quote!{
-					/// This is an overloaded SQL function, it takes one tuple parameter.
-					///
-					/// Valid input types for this function are:
-					#doc_comments
-				};
+		if self.len() == 0 {
+			if opt.debug { println!("Error; retrieved an empty Vec of SqlProcs") };
+			return quote!{  };
+		}
 
-				// output type depending on wether the code is async
-				let fn_code = if opt.sync {
-					quote!{
-						#fn_docs
-						pub fn #name_type<T:#name_type::OverloadTrait>(input : T) -> T::Output {
-							<T as #name_type::OverloadTrait>::tmp(input)
-						}
-					}
+		match opt.use_tuples {
+			Tuples::ForOverloads => {
+				if self.len() == 1 {
+					self[0].to_rust_tokens(opt)
 				} else {
-					quote!{
-						#fn_docs
-						pub fn #name_type<T:#name_type::OverloadTrait>(input : T) -> impl Future<Output = T::Output> {
-							async {
-								<T as #name_type::OverloadTrait>::tmp(input).await
-							}
-						}
-					}
-				};
-
-				let (is_async_trait, async_fn) = if opt.sync {
-					(
-						quote!{ },
-						quote!{ },
-					)
+					to_many_fns(&self, opt)
+				}
+			},
+			Tuples::ForAll => {
+				to_many_fns(&self, opt)
+			},
+			Tuples::NoOverloads => {
+				if self.len() == 1 {
+					self[0].to_rust_tokens(opt)
 				} else {
-					(
-						quote!{
-							use async_trait::async_trait;
-							#[async_trait]
-						},
-						quote!{ async },
-					)
-				};
+					if opt.debug { println!("Overloaded Proc: '{}' not mapped", self[0].name) };
+					quote!{  }
+				}
+			},
+			Tuples::OldestOverload => {
+				self[0].to_rust_tokens(opt)
+			},
+		}
+	}
+}
+fn to_many_fns(procs : &[SqlProc], opt:&Opt) -> TokenStream {
+	let name_type  = format_ident!("{}", &procs[0].name);
+	let doc_comments = to_overload_doc(&procs);
+	let fn_docs = quote!{
+		/// This is an overloaded SQL function, it takes one tuple parameter.
+		///
+		/// Valid input types for this function are:
+		#doc_comments
+	};
 
-				let trait_impls = self.iter().enumerate().map(|(i,p)| to_trait_impl(i,p, opt));
-
-				quote!{
-					#fn_code
-					mod #name_type {
-						use super::*;
-						#is_async_trait
-						pub trait OverloadTrait {
-							type Output;
-							#async_fn fn tmp(self)-> Self::Output;
-						}
-						#(#trait_impls)*
-					}
+	// output type depending on wether the code is async
+	let fn_code = if opt.sync {
+		quote!{
+			#fn_docs
+			pub fn #name_type<T:#name_type::OverloadTrait>(input : T) -> T::Output {
+				<T as #name_type::OverloadTrait>::tmp(input)
+			}
+		}
+	} else {
+		quote!{
+			#fn_docs
+			pub fn #name_type<T:#name_type::OverloadTrait>(input : T) -> impl Future<Output = T::Output> {
+				async {
+					<T as #name_type::OverloadTrait>::tmp(input).await
 				}
 			}
+		}
+	};
+
+	let (is_async_trait, async_fn) = if opt.sync {
+		(
+			quote!{ },
+			quote!{ },
+		)
+	} else {
+		(
+			quote!{
+				use async_trait::async_trait;
+				#[async_trait]
+			},
+			quote!{ async },
+		)
+	};
+
+	let trait_impls = procs.iter().enumerate().map(|(i,p)| to_trait_impl(i,p, opt));
+
+	quote!{
+		#fn_code
+		mod #name_type {
+			use super::*;
+			#is_async_trait
+			pub trait OverloadTrait {
+				type Output;
+				#async_fn fn tmp(self)-> Self::Output;
+			}
+			#(#trait_impls)*
 		}
 	}
 }
@@ -360,7 +385,7 @@ fn to_trait_impl(index : usize, proc : &SqlProc, opt : &Opt) -> TokenStream {
 fn to_tuple_type(types : &[TypeAndName], opt : &Opt) -> TokenStream {
 	let tuple_middle = types.iter().map(|tan| {
 		let tmp = tan.typ.to_tokens();
-		quote!{ &'a #tmp }
+		quote!{ &'a super::#tmp }
 	});
 
 	if opt.sync {
