@@ -282,8 +282,8 @@ impl MyClient {
 						}).collect();
 					assert_eq!(type_name.len(), 1);
 					let (nspname,typename) = type_name.remove(0);
-					let full_typ = format!("super::{}::{}", nspname, typename);
-					ProcOutput::Existing(full_typ)
+
+					ProcOutput::Existing(FullType{ schema : nspname, name : typename })
 				} else {
 					ProcOutput::NewType(outputs)
 				};
@@ -341,11 +341,22 @@ impl MyClient {
 				}).collect();
 			assert_eq!(type_name.len(), 1);
 			let (nspname,typename) = type_name.remove(0);
-			let full_typ = format!("super::{}::{}", nspname, typename);
 
 			match typ_mode as u8 {
-				b'i' => inputs.push(TypeAndName{typ:full_typ, name:arg_name}),
-				b't' => outputs.push(TypeAndName{typ:full_typ, name:arg_name}),
+				b'i' => inputs.push(TypeAndName{
+					typ : FullType{
+						schema : nspname,
+						name : typename,
+					},
+					name : arg_name
+				}),
+				b't' => outputs.push(TypeAndName{
+					typ : FullType{
+						schema : nspname,
+						name : typename,
+					},
+					name:arg_name
+				}),
 				_ => ()//panic!("Only input params and table outputs supported")
 			}
 		}

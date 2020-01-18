@@ -1,15 +1,8 @@
 //! Connects to a PostgreSQL database and creates a rust module representing all the schemas complete with mappings for stored functions/procedures
 
-pub mod connection;
-
-// Code generation using strings is being depreciated for now
-// however I'm leaving it in as commented out code because it was signicantly faster than using syn and quote
-// mod db_model;
-
 mod sql_tree;
-
+pub mod connection;
 pub mod ast_convert;
-
 
 pub const VERSION: &str = std::env!("CARGO_PKG_VERSION");
 

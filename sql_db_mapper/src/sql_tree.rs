@@ -107,7 +107,7 @@ pub struct SqlProc {
 
 #[derive(Debug, Clone)]
 pub struct TypeAndName {
-	pub typ : String,
+	pub typ : FullType,
 	pub name : String
 }
 
@@ -115,7 +115,14 @@ pub struct TypeAndName {
 #[derive(Debug, Clone)]
 pub enum ProcOutput {
 	/// The procedure returns an existing type (columns of a table, user defined enum)
-	Existing(String),
+	Existing(FullType),
 	/// The procedure returns a new anonymous type
 	NewType(Vec<TypeAndName>)
+}
+
+
+#[derive(Debug, Clone)]
+pub struct FullType {
+	pub schema : String,
+	pub name : String,
 }
