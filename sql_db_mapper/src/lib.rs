@@ -28,6 +28,10 @@ pub struct Opt {
 	#[structopt(short, long)]
 	pub ugly: bool,
 
+	/// Include derives for serde on all generated types
+	#[structopt(long)]
+	pub serde: bool,
+
 	/// How to use tuples (used by default for just overloads). Options:
 	/// overloads (the default, use tuples to represent function overloading).
 	/// all (Have all functions take a tuple for consitency).

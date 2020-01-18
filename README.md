@@ -14,18 +14,26 @@ SQL procedures/functons which are overloaded (two with the same name and differe
 
 ### Help
 ```
-sql_db_mapper 0.0.2
+sql_db_mapper 0.0.3
 Generate a rust wrapper for a PostgreSQL database
 
 USAGE:
-    sql_db_mapper [FLAGS] <conn-string> [output]
+    sql_db_mapper [FLAGS] [OPTIONS] <conn-string> [output]
 
 FLAGS:
     -d, --debug      Activate debug mode
     -h, --help       Prints help information
+        --serde      Include derives for serde on all generated types
     -s, --sync       Generate synchronous mapping
     -u, --ugly       Skip running output through rustfmt
     -V, --version    Prints version information
+
+OPTIONS:
+        --use-tuples <use-tuples>    How to use tuples (used by default for just overloads). Options:
+                                     overloads (the default, use tuples to represent function overloading)
+                                     all (Have all functions take a tuple for consitency).
+                                     none (skip mapping overloaded procs at all).
+                                     one_overload (avoid tuples by only mapping the oldest sql proc in the database)
 
 ARGS:
     <conn-string>    String to connect to database, see tokio_postgres::Config for details
@@ -40,11 +48,11 @@ Features a derive macro from TryFromRow (defined in sql_db_mapper_core) which pr
 
 ### Future Work
 * more options relating to how the code is generated
-	* derives that may be wanted (serde comes to mind)
 	* a derive or other proc_macro version of the code. It may not be recommended for compile time reasons but perhaps somebody would appreciate it
 	* generate a whole (properly-structured) crate wrapping the database rather than one file and printing the dependencies to the console
 	* use heck to allow names to be mapped to appropriate rust equivalents
 	* Grab text from `COMMENT ON` and stick it in doc comments
+	* Allow functions that take (for example) an &varchar to take an &str (varchar is a typedef of String so functions would need to be generic like HashMap's get)
 * consider adding support for other popular databases as well
 	* either through connecting to the database as is being currently done or possibly by parsing SQL itself
 

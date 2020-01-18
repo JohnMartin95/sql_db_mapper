@@ -40,18 +40,26 @@ pub use rust_decimal::{
 };
 pub use chrono;
 
-use chrono::{NaiveDateTime, NaiveDate, DateTime, Utc, Duration};
+use chrono::{NaiveDateTime, NaiveDate, DateTime, Utc};
+use time::Duration;
 
 pub use sql_db_mapper_derive::*;
 
 pub use postgres_derive::*;
+
+#[cfg(feature = "serde")]
+pub use serde::{
+	self,
+	Serialize,
+	Deserialize,
+};
 
 
 pub trait TryFromRow: Sized {
 	fn from_row(row : Row) -> Result<Self, SqlError>;
 }
 
-
+#[cfg_attr(feature = "with_serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone)]
 pub struct Interval {
 	pub dur : Duration
@@ -67,8 +75,8 @@ impl FromSql<'_> for Interval {
 }
 impl ToSql for Interval {
 	fn to_sql(&self, _ty: &Type, mut out: &mut bytes::BytesMut) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
-		let i = self.dur.num_milliseconds();
-		i.to_sql(&Type::INT4, &mut out)
+		let i = self.dur.whole_milliseconds();
+		(i as i64).to_sql(&Type::INT4, &mut out)
 	}
 	fn accepts(ty: &Type) -> bool {
 		ty.oid() == 1186

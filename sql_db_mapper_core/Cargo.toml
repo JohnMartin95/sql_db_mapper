@@ -23,8 +23,12 @@ sql_db_mapper_derive = { path = "../sql_db_mapper_derive", version = "0.0.2" }
 # helpful types
 rust_decimal = { version = "1.1", features = ["postgres"] }
 chrono = "0.4"
+time = "0.2.3"
 bytes = "0.5"
+#serde
+serde = { version = "1.0", features = ["derive"], optional = true }
 
 
 [features]
 sync = ["postgres"]
+with_serde = ["serde", "chrono/serde", "time/serde"]

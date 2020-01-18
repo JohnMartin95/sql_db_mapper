@@ -17,20 +17,30 @@ fn main() {
 
 	let conn = Client::connect(&opt.conn_string, NoTls).expect("Failed to connect to database, please check your connection string and try again");
 
+	let mut dependencies = String::from("[dependencies]\npostgres-types = \"0.1\"\n");
+
 	if opt.sync {
-		println!(r#"
-[dependencies]
-sql_db_mapper_core = {{ version = "0.0.2", features=["sync"] }}
-postgres-types = "0.1"
-"#);
+		if opt.serde {
+			dependencies += "sql_db_mapper_core = { version = \"0.0.2\", features=[\"sync\", \"with_serde\"] }\n";
+		} else {
+			dependencies += "sql_db_mapper_core = { version = \"0.0.2\", features=[\"sync\"] }\n";
+		}
 	} else {
-		println!(r#"
-[dependencies]
-sql_db_mapper_core = "0.0.2"
-postgres-types = "0.1"
-async-trait = "0.1.22"
-"#);
+		dependencies += "async-trait = \"0.1.22\"\n";
+		if opt.serde {
+			dependencies += "sql_db_mapper_core = { version = \"0.0.2\", features=[\"with_serde\"] }\n";
+		} else {
+			dependencies += "sql_db_mapper_core = \"0.0.2\"\n";
+		}
 	}
+	// dependencies +=
+	// match (opt.sync, opt.serde) {
+	// 	(true,  true ) => "sql_db_mapper_core = { version = \"0.0.2\", features=[\"sync\", \"with_serde\"] }\n",
+	// 	(true,  false) => "sql_db_mapper_core = { version = \"0.0.2\", features=[\"sync\"] }\n",
+	// 	(false, true ) => "async-trait = \"0.1.22\"\nsql_db_mapper_core = { version = \"0.0.2\", features=[\"with_serde\"] }\n",
+	// 	(false, false) => "async-trait = \"0.1.22\"\nsql_db_mapper_core = \"0.0.2\"\n",
+	// };
+	println!("{}", dependencies);
 
 	let mut conn = MyClient::new(conn);
 	let full_db = conn.get_all();

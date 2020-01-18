@@ -152,7 +152,7 @@ impl ConvertToAst for PsqlType {
 }
 
 /// creates the syn node for an enum
-fn enum_to_ast_helper(e : &PsqlEnumType, name : &str, _opt : &Opt) -> TokenStream {
+fn enum_to_ast_helper(e : &PsqlEnumType, name : &str, opt : &Opt) -> TokenStream {
 	let name_type = format_ident!("{}", name);
 
 	//the enum definition itself
@@ -161,9 +161,10 @@ fn enum_to_ast_helper(e : &PsqlEnumType, name : &str, _opt : &Opt) -> TokenStrea
 		.map(|v| {
 			format_ident!("{}", v)
 		});
+	let derives = get_derives(opt.serde);
 
 	quote!{
-		#[derive(Debug, Clone, TryFromRow, ToSql, FromSql)]
+		#derives
 		pub enum #name_type {
 			#(#enum_body),*
 		}
@@ -171,7 +172,7 @@ fn enum_to_ast_helper(e : &PsqlEnumType, name : &str, _opt : &Opt) -> TokenStrea
 }
 
 /// creates the syn node for a struct
-fn composite_to_ast_helper(c : &PsqlCompositeType, name : &str, _opt : &Opt) -> TokenStream {
+fn composite_to_ast_helper(c : &PsqlCompositeType, name : &str, opt : &Opt) -> TokenStream {
 	let name_type = format_ident!("{}", name);
 
 	let struct_body = c.cols
@@ -186,9 +187,10 @@ fn composite_to_ast_helper(c : &PsqlCompositeType, name : &str, _opt : &Opt) -> 
 				quote!{ pub #field_name : Option<super::#schema_name::#type_name> }
 			}
 		});
+	let derives = get_derives(opt.serde);
 
 	quote!{
-		#[derive(Debug, Clone, TryFromRow, ToSql, FromSql)]
+		#derives
 		pub struct #name_type {
 			#(#struct_body),*
 		}
@@ -223,13 +225,14 @@ fn base_to_ast_helper(b : &PsqlBaseType, opt : &Opt) -> TokenStream {
 }
 
 /// creates the syn node for a domain (newtype)
-fn domain_to_ast_helper(b : &PsqlDomain, name : &str, _opt : &Opt) ->  TokenStream {
+fn domain_to_ast_helper(b : &PsqlDomain, name : &str, opt : &Opt) ->  TokenStream {
 	let name_type   = format_ident!("{}", name);
 	let schema_name = format_ident!("{}", &b.base_ns_name);
 	let type_name   = format_ident!("{}", &b.base_name);
+	let derives = get_derives(opt.serde);
 
 	quote!{
-		#[derive(Debug, Clone, TryFromRow, ToSql, FromSql)]
+		#derives
 		pub struct #name_type(pub super::#schema_name::#type_name);
 	}
 }
@@ -446,9 +449,10 @@ fn as_rust_helper(proc : &SqlProc, name : &str, is_overide : bool, opt : &Opt) -
 					pub #field_name : #type_name
 				}
 			});
+		let derives = get_derives(opt.serde);
 
 		quote!{
-			#[derive(Debug, Clone, TryFromRow, ToSql, FromSql)]
+			#derives
 			pub struct #struct_name {
 				#(#struct_body),*
 			}
@@ -592,5 +596,14 @@ fn as_query_params(inputs : &[TypeAndName]) -> TokenStream {
 
 	quote!{
 		#(#names),*
+	}
+}
+
+
+fn get_derives(serde : bool) -> TokenStream {
+	if serde {
+		quote!{ #[derive(Debug, Clone, TryFromRow, ToSql, FromSql, Serialize, Deserialize)] }
+	} else {
+		quote!{ #[derive(Debug, Clone, TryFromRow, ToSql, FromSql)] }
 	}
 }
