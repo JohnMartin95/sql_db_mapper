@@ -13,6 +13,7 @@ use quote::{
 use proc_macro2::{
 	TokenStream,
 };
+use heck::*;
 
 /// helper trait that does extend but consumes and returns self
 trait MyExtend<A> : Extend<A> {
@@ -22,6 +23,23 @@ impl<T, A: Extend<T>> MyExtend<T> for A {
 	fn extend2<I: IntoIterator<Item=T>>(mut self, iter: I) -> Self {
 		self.extend(iter);
 		self
+	}
+}
+enum Case {
+	SnakeCase,
+	CamelCase,
+	ShoutySnake,
+}
+use Case::*;
+fn format_heck(name : &str, opt:&Opt, case : Case) -> proc_macro2::Ident {
+	if opt.formatted {
+		match case {
+			SnakeCase   => format_ident!("{}", name.to_snake_case()),
+			CamelCase   => format_ident!("{}", name.to_camel_case()),
+			ShoutySnake => format_ident!("{}", name.to_shouty_snake_case()),
+		}
+	} else {
+		format_ident!("{}", name)
 	}
 }
 
@@ -63,7 +81,7 @@ impl ConvertToAst for FullDB {
 	/// ```
 	fn to_rust_tokens(&self, opt : &Opt)-> TokenStream {
 		let schemas = self.schemas.iter().map(|v| {
-			let name = format_ident!("{}", v.name);
+			let name = format_heck(&v.name, opt, SnakeCase);
 			if opt.dir {
 				quote!{
 					pub mod #name;
@@ -77,11 +95,18 @@ impl ConvertToAst for FullDB {
 				}
 			}
 		});
+		let fixed_case = if opt.formatted {
+			quote!{}
+		} else {
+			quote!{
+				#![allow(non_snake_case)]
+				#![allow(non_camel_case_types)]
+			}
+		};
 
 		quote!{
-			#![allow(non_snake_case)]
 			#![allow(unused_imports)]
-			#![allow(non_camel_case_types)]
+			#fixed_case
 			pub use sql_db_mapper_core as orm;
 			use orm::*;
 			#(#schemas)*
@@ -202,8 +227,8 @@ impl ConvertToAst for PsqlType {
 			Base(b)      => base_to_ast_helper(b, opt),
 			Domain(d)    => domain_to_ast_helper(d, &self.name, opt),
 			Other        => {
-				let name_type = format_ident!("{}", self.name);
 				if self.oid == 2278 {
+					let name_type = format_heck(&self.name, opt, CamelCase);
 					quote!{ pub type #name_type = (); }
 				} else {
 					if opt.debug { println!("Couldn't convert type: {}, {}", self.name, self.oid) };
@@ -216,13 +241,13 @@ impl ConvertToAst for PsqlType {
 
 /// creates the syn node for an enum
 fn enum_to_ast_helper(e : &PsqlEnumType, name : &str, opt : &Opt) -> TokenStream {
-	let name_type = format_ident!("{}", name);
+	let name_type = format_heck(name, opt, CamelCase);
 
 	//the enum definition itself
 	let enum_body = e.labels
 		.iter()
 		.map(|v| {
-			format_ident!("{}", v)
+			format_heck(v, opt, CamelCase)
 		});
 	let derives = get_derives(opt.serde);
 
@@ -236,14 +261,14 @@ fn enum_to_ast_helper(e : &PsqlEnumType, name : &str, opt : &Opt) -> TokenStream
 
 /// creates the syn node for a struct
 fn composite_to_ast_helper(c : &PsqlCompositeType, name : &str, opt : &Opt) -> TokenStream {
-	let name_type = format_ident!("{}", name);
+	let name_type = format_heck(name, opt, CamelCase);
 
 	let struct_body = c.cols
 		.iter()
 		.map(|v| {
-			let field_name = format_ident!("{}", &v.name);
-			let schema_name = format_ident!("{}", &v.type_ns_name);
-			let type_name = format_ident!("{}", &v.type_name);
+			let field_name = format_heck(&v.name, opt, SnakeCase);
+			let schema_name = format_heck(&v.type_ns_name, opt, SnakeCase);
+			let type_name = format_heck(&v.type_name, opt, CamelCase);
 			if v.not_null {
 				quote!{ pub #field_name : super::#schema_name::#type_name }
 			} else {
@@ -262,10 +287,10 @@ fn composite_to_ast_helper(c : &PsqlCompositeType, name : &str, opt : &Opt) -> T
 
 /// creates the syn node for a base type (typedef)
 fn base_to_ast_helper(b : &PsqlBaseType, opt : &Opt) -> TokenStream {
-	let name_type = format_ident!("{}", &b.name);
+	let name_type = format_heck(&b.name, opt, CamelCase);
 
 	let oid_type = match b.oid {
-		16 => return quote!{ pub use bool; },
+		16 => quote!{ bool },
 		17 => quote!{ Vec<u8> },
 		20 => quote!{ i64 },
 		23 => quote!{ i32 },
@@ -274,7 +299,7 @@ fn base_to_ast_helper(b : &PsqlBaseType, opt : &Opt) -> TokenStream {
 		1082 => quote!{ chrono::NaiveDate },
 		1114 => quote!{ chrono::NaiveDateTime },
 		1184 => quote!{ chrono::DateTime<chrono::Utc> },
-		1186 => quote!{ Interval },
+		1186 => quote!{ sql_db_mapper_core::Interval },
 		1700 => quote!{ rust_decimal::Decimal },
 		2278 => quote!{ () },
 		oid => {
@@ -289,9 +314,9 @@ fn base_to_ast_helper(b : &PsqlBaseType, opt : &Opt) -> TokenStream {
 
 /// creates the syn node for a domain (newtype)
 fn domain_to_ast_helper(b : &PsqlDomain, name : &str, opt : &Opt) ->  TokenStream {
-	let name_type   = format_ident!("{}", name);
-	let schema_name = format_ident!("{}", &b.base_ns_name);
-	let type_name   = format_ident!("{}", &b.base_name);
+	let name_type   = format_heck(name, opt, CamelCase);
+	let schema_name = format_heck(&b.base_ns_name, opt, SnakeCase);
+	let type_name   = format_heck(&b.base_name, opt, CamelCase);
 	let derives = get_derives(opt.serde);
 
 	quote!{
@@ -384,8 +409,8 @@ impl ConvertToAst for Vec<SqlProc> {
 	}
 }
 fn to_many_fns(procs : &[SqlProc], opt:&Opt) -> TokenStream {
-	let name_type  = format_ident!("{}", &procs[0].name);
-	let doc_comments = to_overload_doc(&procs);
+	let name_type = format_heck(&procs[0].name, opt, SnakeCase);
+	let doc_comments = to_overload_doc(&procs, opt);
 	let fn_docs = quote!{
 		/// This is an overloaded SQL function, it takes one tuple parameter.
 		///
@@ -450,7 +475,7 @@ fn to_trait_impl(index : usize, proc : &SqlProc, opt : &Opt) -> TokenStream {
 }
 fn to_tuple_type(types : &[TypeAndName], opt : &Opt) -> TokenStream {
 	let tuple_middle = types.iter().map(|tan| {
-		let tmp = tan.typ.to_tokens();
+		let tmp = tan.typ.to_tokens(opt);
 		quote!{ &'a super::#tmp }
 	});
 
@@ -460,21 +485,21 @@ fn to_tuple_type(types : &[TypeAndName], opt : &Opt) -> TokenStream {
 		quote!{ (&'a Client, #(#tuple_middle),* ) }
 	}
 }
-fn to_tuple_pattern(types : &[TypeAndName]) -> TokenStream {
+fn to_tuple_pattern(types : &[TypeAndName], opt : &Opt) -> TokenStream {
 	let tuple_middle = types.iter().map(|tan| {
-		format_ident!("{}", tan.name)
+		format_heck(&tan.name, opt, SnakeCase)
 	});
 	quote!{
 		(client, #(#tuple_middle),* )
 	}
 }
 
-fn to_overload_doc(procs : &[SqlProc]) -> TokenStream {
+fn to_overload_doc(procs : &[SqlProc], opt:&Opt) -> TokenStream {
 	procs.iter().enumerate().map(|(i,v)| {
 		let name = &v.name;
-		let func_parms = v.inputs.as_function_params();
+		let func_parms = v.inputs.as_function_params(opt);
 		let ret_type_name = match &v.outputs {
-			ProcOutput::Existing(t) => t.to_tokens().to_string(),
+			ProcOutput::Existing(t) => t.to_tokens(opt).to_string(),
 			ProcOutput::NewType(_) => format!("{}{}Return", name, i)
 		};
 		let new_ret_type_name =
@@ -492,10 +517,10 @@ fn to_overload_doc(procs : &[SqlProc]) -> TokenStream {
 
 
 fn as_rust_helper(proc : &SqlProc, name : &str, is_overide : bool, opt : &Opt) -> TokenStream {
-	let name_type = format_ident!("{}", name);
+	let name_type = format_heck(name, opt, SnakeCase);
 
 	//build SQL string to call proc
-	let call_string_name = format_ident!("{}_SQL", name.to_uppercase());
+	let call_string_name = format_heck(&format!("{}_SQL", name), opt, ShoutySnake);
 
 	let call_string = make_call_string(&proc.ns_name, &proc.name, proc.num_args as usize);
 	let call_string = quote!{ const #call_string_name : &str = #call_string; };
@@ -503,11 +528,11 @@ fn as_rust_helper(proc : &SqlProc, name : &str, is_overide : bool, opt : &Opt) -
 	//if proc returns table create type for that proc
 	let new_return_type =
 	if let ProcOutput::NewType(tans) = &proc.outputs {
-		let struct_name = format_ident!("{}Return", name);
+		let struct_name = format_heck(&format!("{}Return", name), opt, CamelCase);
 		let struct_body = tans.iter()
 			.map(|tan| -> TokenStream {
-				let field_name = format_ident!("{}", &tan.name);
-				let type_name  = tan.typ.to_tokens();
+				let field_name = format_heck(&tan.name, opt, SnakeCase);
+				let type_name  = tan.typ.to_tokens(opt);
 				quote!{
 					pub #field_name : #type_name
 				}
@@ -531,7 +556,7 @@ fn as_rust_helper(proc : &SqlProc, name : &str, is_overide : bool, opt : &Opt) -
 				if opt.debug { println!("Cannot make wrapper for procedure {} which returns pg_catalog::record", name) };
 				return quote!{};
 			} else {
-				let typ = t.to_tokens();
+				let typ = t.to_tokens(opt);
 				if is_overide {
 					quote!{ super::#typ }
 				} else {
@@ -540,7 +565,7 @@ fn as_rust_helper(proc : &SqlProc, name : &str, is_overide : bool, opt : &Opt) -
 			}
 		},
 		ProcOutput::NewType(_) => {
-			let ret_name = format_ident!("{}Return", name);
+			let ret_name = format_heck(&format!("{}Return", name), opt, CamelCase);
 			quote!{ #ret_name }
 		}
 	};
@@ -552,8 +577,8 @@ fn as_rust_helper(proc : &SqlProc, name : &str, is_overide : bool, opt : &Opt) -
 			quote!{ Option<#ret_type_name> }
 		};
 
-	let func_params = proc.inputs.as_function_params();
-	let query_params = as_query_params(&proc.inputs);
+	let func_params = proc.inputs.as_function_params(opt);
+	let query_params = as_query_params(&proc.inputs, opt);
 
 	let (opt_async, opt_await, is_async_trait, client_type) = if opt.sync {
 		(quote!{  }, quote!{  }, quote!{  }, quote!{ &mut Client })
@@ -585,7 +610,7 @@ fn as_rust_helper(proc : &SqlProc, name : &str, is_overide : bool, opt : &Opt) -
 	let func_text =
 	if is_overide {
 		let tuple_type = to_tuple_type(&proc.inputs, opt);
-		let tuple_pattern = to_tuple_pattern(&proc.inputs);
+		let tuple_pattern = to_tuple_pattern(&proc.inputs, opt);
 		quote!{
 			#is_async_trait
 			impl<'a> OverloadTrait for #tuple_type {
@@ -624,22 +649,22 @@ impl ConvertToAst for SqlProc {
 }
 
 impl FullType {
-	fn to_tokens(&self) -> TokenStream {
-		let typ  = format_ident!("{}", self.name);
-		let schema = format_ident!("{}", self.schema);
+	fn to_tokens(&self, opt:&Opt) -> TokenStream {
+		let typ    = format_heck(&self.name, opt, CamelCase);
+		let schema = format_heck(&self.schema, opt, SnakeCase);
 		quote!{ super::#schema::#typ }
 	}
 }
 
 
 trait ToFuncParams {
-	fn as_function_params(&self) -> TokenStream;
+	fn as_function_params(&self, opt:&Opt) -> TokenStream;
 }
 impl ToFuncParams for Vec<TypeAndName> {
-	fn as_function_params(&self) -> TokenStream {
+	fn as_function_params(&self, opt:&Opt) -> TokenStream {
 		self.iter().map(|tan| {
-			let name = format_ident!("{}", tan.name);
-			let typ  = tan.typ.to_tokens();
+			let name = format_heck(&tan.name, opt, SnakeCase);
+			let typ  = tan.typ.to_tokens(opt);
 			quote!{ #name : &#typ, }
 		}).collect()
 	}
@@ -654,8 +679,10 @@ fn make_call_string(namespace : &str, function : &str, len : usize) -> String {
 	ret
 }
 
-fn as_query_params(inputs : &[TypeAndName]) -> TokenStream {
-	let names = inputs.iter().map(|tan| format_ident!("{}", tan.name));
+fn as_query_params(inputs : &[TypeAndName], opt:&Opt) -> TokenStream {
+	let names = inputs.iter().map(|tan|
+		format_heck(&tan.name, opt, SnakeCase)
+	);
 
 	quote!{
 		#(#names),*

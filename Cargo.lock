@@ -751,6 +751,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "sql_db_mapper"
 version = "0.0.3"
 dependencies = [
+ "heck 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "postgres 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "proc-macro2 1.0.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "quote 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",

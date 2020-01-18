@@ -36,6 +36,10 @@ pub struct Opt {
 	#[structopt(long)]
 	pub dir: bool,
 
+	/// Convert names from the database to rust standard (i.e. table names in CamelCase, fields and functions in snake_case)
+	#[structopt(short, long)]
+	pub formatted: bool,
+
 	/// How to use tuples (used by default for just overloads). Options:
 	/// overloads (the default, use tuples to represent function overloading).
 	/// all (Have all functions take a tuple for consitency).

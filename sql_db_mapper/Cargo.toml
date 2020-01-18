@@ -15,6 +15,7 @@ postgres  = { version = "0.17", features = ["with-chrono-0_4"] }
 quote = { version = "1.0.2" }
 proc-macro2 = { version = "1.0.7" }
 structopt = "0.3"
+heck = "0.3.1"
 
 [lib]
 name = "sql_db_mapper"

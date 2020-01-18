@@ -21,12 +21,16 @@ USAGE:
     sql_db_mapper [FLAGS] [OPTIONS] <conn-string> [output]
 
 FLAGS:
-    -d, --debug      Activate debug mode
-    -h, --help       Prints help information
-        --serde      Include derives for serde on all generated types
-    -s, --sync       Generate synchronous mapping
-    -u, --ugly       Skip running output through rustfmt
-    -V, --version    Prints version information
+    -d, --debug        Activate debug mode
+        --dir          Program will treat output as a directory name rather than a file and generate a whole crate. If
+                       output is not provided code is printed as usual
+    -f, --formatted    Convert names from the database to rust standard (i.e. table names in CamelCase, fields and
+                       functions in snake_case)
+    -h, --help         Prints help information
+        --serde        Include derives for serde on all generated types
+    -s, --sync         Generate synchronous mapping
+    -u, --ugly         Skip running output through rustfmt
+    -V, --version      Prints version information
 
 OPTIONS:
         --use-tuples <use-tuples>    How to use tuples (used by default for just overloads). Options:
@@ -49,7 +53,6 @@ Features a derive macro from TryFromRow (defined in sql_db_mapper_core) which pr
 ### Future Work
 * more options relating to how the code is generated
 	* a derive or other proc_macro version of the code. It may not be recommended for compile time reasons but perhaps somebody would appreciate it
-	* use heck to allow names to be mapped to appropriate rust equivalents
 	* Grab text from `COMMENT ON` and stick it in doc comments
 	* Allow functions that take (for example) an &varchar to take an &str (varchar is a typedef of String so functions would need to be generic like HashMap's get)
 * consider adding support for other popular databases as well
