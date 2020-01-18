@@ -205,11 +205,11 @@ fn base_to_ast_helper(b : &PsqlBaseType, opt : &Opt) -> TokenStream {
 		23 => quote!{ i32 },
 		26 => quote!{ u32 },
 		25 | 1042 | 1043 => quote!{ String },
-		1082 => quote!{ NaiveDate },
-		1114 => quote!{ NaiveDateTime },
-		1184 => quote!{ DateTime<Utc> },
+		1082 => quote!{ chrono::NaiveDate },
+		1114 => quote!{ chrono::NaiveDateTime },
+		1184 => quote!{ chrono::DateTime<chrono::Utc> },
 		1186 => quote!{ Interval },
-		1700 => quote!{ Decimal },
+		1700 => quote!{ rust_decimal::Decimal },
 		2278 => quote!{ () },
 		oid => {
 			if opt.debug { println!("No Rust type for postgres type with oid : {}", oid) };

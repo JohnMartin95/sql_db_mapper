@@ -13,7 +13,6 @@ edition = "2018"
 [dependencies]
 # async dependencies, though tokio-postgres would be in the dependency tree regardless
 tokio-postgres = { version = "0.5.1", features = ["with-chrono-0_4"] }
-async-trait = { version = "0.1.22" }
 # sync dependency
 postgres  = { version = "0.17", features = ["with-chrono-0_4"], optional = true }
 # general postgre dependencies
