@@ -95,22 +95,32 @@ impl Opt {
 			String::from("my_db_mapping")
 		};
 
-		let mut dependencies = format!("[package]\nname = \"{}\"\nversion = \"0.1.0\"\nedition = \"2018\"\n\n[dependencies]\npostgres-types = \"0.1\"\n", package_name);
+		let mut dependencies = format!("[package]\nname = \"{}\"", package_name);
+		dependencies += r#"
+version = "0.1.0"
+edition = "2018"
 
-		if !self.sync {
+[dependencies]
+postgres-types = "0.1"
+chrono = "0.4"
+rust_decimal = { version = "1.1", features = ["postgres"] }
+postgres-derive = "0.4"
+"#;
+
+		if self.sync {
+			dependencies += "postgres  = { version = \"0.17\", features = [\"with-chrono-0_4\"] }\n";
+		} else {
+			dependencies += "tokio-postgres = { version = \"0.5.1\", features = [\"with-chrono-0_4\"] }\n";
 			dependencies += "async-trait = \"0.1.22\"\n";
 		}
+
 		if self.serde {
 			dependencies += "serde = { version = \"1.0\", features = [\"derive\"] }\n";
+			dependencies += "sql_db_mapper_core = { version = \"0.0.2\", features=[\"with_serde\"] }\n";
+		} else {
+			dependencies += "sql_db_mapper_core = \"0.0.2\"\n";
 		}
 
-		dependencies +=
-		match (self.sync, self.serde) {
-			(true,  true ) => "sql_db_mapper_core = { version = \"0.0.2\", features=[\"sync\", \"with_serde\"] }\n",
-			(true,  false) => "sql_db_mapper_core = { version = \"0.0.2\", features=[\"sync\"] }\n",
-			(false, true ) => "sql_db_mapper_core = { version = \"0.0.2\", features=[\"with_serde\"] }\n",
-			(false, false) => "sql_db_mapper_core = \"0.0.2\"\n",
-		};
 		dependencies
 	}
 }

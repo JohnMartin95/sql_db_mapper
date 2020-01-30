@@ -536,16 +536,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "postgres-derive"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "proc-macro2 1.0.7 (registry+https://github.com/rust-lang/crates.io-index)",
- "quote 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "syn 1.0.13 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "postgres-protocol"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -764,8 +754,6 @@ version = "0.0.2"
 dependencies = [
  "bytes 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "chrono 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "postgres 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "postgres-derive 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "postgres-types 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rust_decimal 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.104 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1090,7 +1078,6 @@ dependencies = [
 "checksum pin-project-lite 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "e8822eb8bb72452f038ebf6048efa02c3fe22bf83f76519c9583e47fc194a422"
 "checksum pin-utils 0.1.0-alpha.4 (registry+https://github.com/rust-lang/crates.io-index)" = "5894c618ce612a3fa23881b152b608bafb8c56cfc22f434a3ba3120b40f7b587"
 "checksum postgres 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)" = "96dd5c8eddec65a5497798ebde2e5c74a93ef8b66782c1b09eeab9bb8538aebc"
-"checksum postgres-derive 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "c857dd221cb0e7d8414b894a0ce29eae44d453dda0baa132447878e75e701477"
 "checksum postgres-protocol 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "a30f0e172ae0fb0653dbf777ad10a74b8e58d6de95a892f2e1d3e94a9df9a844"
 "checksum postgres-types 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "eab1dd99401779ab03bc3872f196fb02c420e76f416c850be494a6f2d67287ad"
 "checksum ppv-lite86 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)" = "74490b50b9fbe561ac330df47c08f3f33073d2d00c150f719147d7c54522fa1b"

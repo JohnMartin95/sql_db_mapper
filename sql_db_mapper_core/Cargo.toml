@@ -11,13 +11,10 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-# async dependencies, though tokio-postgres would be in the dependency tree regardless
+# dependency for TryFromRow trait which uses Row and Error types
 tokio-postgres = { version = "0.5.1", features = ["with-chrono-0_4"] }
-# sync dependency
-postgres  = { version = "0.17", features = ["with-chrono-0_4"], optional = true }
-# general postgre dependencies
+# general postgres dependencies
 postgres-types = { version = "0.1.0" }
-postgres-derive = "0.4"
 # derives
 sql_db_mapper_derive = { path = "../sql_db_mapper_derive", version = "0.0.2" }
 # helpful types
@@ -30,5 +27,4 @@ serde = { version = "1.0", features = ["derive"], optional = true }
 
 
 [features]
-sync = ["postgres"]
 with_serde = ["serde", "chrono/serde", "time/serde"]

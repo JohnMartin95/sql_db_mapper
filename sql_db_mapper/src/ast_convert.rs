@@ -95,6 +95,7 @@ impl ConvertToAst for FullDB {
 				}
 			}
 		});
+		//allows if case isn't fixed
 		let fixed_case = if opt.formatted {
 			quote!{}
 		} else {
@@ -103,11 +104,45 @@ impl ConvertToAst for FullDB {
 				#![allow(non_camel_case_types)]
 			}
 		};
+		//uses that depend on if the code is sync
+		let client_use = if opt.sync {
+			quote!{
+				pub use postgres::{
+					Client,
+					Error as SqlError,
+				};
+				use postgres::row::Row;
+			}
+		} else {
+			quote!{
+				pub use tokio_postgres::{
+					Client,
+					Error as SqlError,
+				};
+				use tokio_postgres::row::Row;
+				pub use std::future::Future;
+			}
+		};
+		//serde use
+		let serde_use = if opt.serde {
+			quote!{
+				use serde::{
+					Serialize,
+					Deserialize,
+				};
+			}
+		} else {
+			quote!{}
+		};
 
 		quote!{
 			#![allow(unused_imports)]
 			#fixed_case
 			pub use sql_db_mapper_core as orm;
+			use chrono;
+			use postgres_derive::*;
+			#client_use
+			#serde_use
 			use orm::*;
 			#(#schemas)*
 		}

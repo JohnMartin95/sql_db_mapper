@@ -1,64 +1,39 @@
 //! Helper types and functions for auto-generateed psql database wrappers
 //!
-//! Reexports the Client and Row type as well of redefining the error type to SqlError
+//! Provides the TryFromRow trait which converts from a tokio_postgres Row. Implementations are provided for common types
 //!
-//! Also rexports the underlying database connector as db_frontend for convience
+//! Also contains Interval which represents a SQL Interval
+//!
+//! Reexports tokio_postgres::Error as SqlError (the Result::Err of the return from TryFromRow::from_row) and tokio_postgres::row::Row
 
-/// Contains and reexports types that callers of the wrapped db would need to use it
-#[cfg(not(feature = "sync"))]
+/// Contains and reexports types that used by the TryFromRow trait
 pub use tokio_postgres::{
-	self as db_frontend,
-	Client,
 	Error as SqlError,
 	row::Row,
 };
 
-#[cfg(feature = "sync")]
-pub use postgres::{
-	self as db_frontend,
-	Client,
-	Error as SqlError,
-	row::Row,
-};
-
-pub use postgres_types::{
+use postgres_types::{
 	FromSql,
 	ToSql,
 	IsNull,
 	Type,
+	to_sql_checked,
 };
-use postgres_types::to_sql_checked;
 
 use std::error::Error;
 
-#[cfg(not(feature = "sync"))]
-pub use std::future::Future;
-
-pub use rust_decimal::{
-	self,
-	prelude::*
-};
-pub use chrono;
+use rust_decimal;
 
 use chrono::{NaiveDateTime, NaiveDate, DateTime, Utc};
 use time::Duration;
 
 pub use sql_db_mapper_derive::*;
 
-pub use postgres_derive::*;
-
-#[cfg(feature = "serde")]
-pub use serde::{
-	self,
-	Serialize,
-	Deserialize,
-};
-
-
 pub trait TryFromRow: Sized {
 	fn from_row(row : Row) -> Result<Self, SqlError>;
 }
 
+/// Wrapper type around a time::Duration that implements ToSql and FromSql
 #[cfg_attr(feature = "with_serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone)]
 pub struct Interval {
