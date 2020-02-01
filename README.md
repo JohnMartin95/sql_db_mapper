@@ -10,15 +10,15 @@ Once generated the generated code does not contain additional checks that the da
 
 All functions generated take the client used to connect to the database as the first argument
 
-SQL procedures/functons which are overloaded (two with the same name and different arguments) are mapped in this crate to functions which take a single tuple i,e, `my_func((client, id, "hello")) and my_func((client, id))` this means overloading a previously not overloaded SQL procedure would be a breaking change with regards to the generated code
+SQL procedures/functons which are overloaded (two with the same name and different arguments) are mapped in this crate to functions which take a single tuple i,e, `my_func((client, id, "hello")) and my_func((client, id))` this means overloading a previously not overloaded SQL procedure would be a breaking change with regards to the generated code (unless use-tuples with options all or one are used)
 
 ### Help
 ```
-sql_db_mapper 0.0.3
+sql_db_mapper 0.0.4
 Generate a rust wrapper for a PostgreSQL database
 
 USAGE:
-    sql_db_mapper [FLAGS] [OPTIONS] <conn-string> [output]
+    sql_db_mapper [FLAGS] [OPTIONS] --conn <conn> [output]
 
 FLAGS:
     -d, --debug        Activate debug mode
@@ -33,22 +33,25 @@ FLAGS:
     -V, --version      Prints version information
 
 OPTIONS:
-        --use-tuples <use-tuples>    How to use tuples (used by default for just overloads). Options:
-                                     overloads (the default, use tuples to represent function overloading)
-                                     all (Have all functions take a tuple for consitency).
-                                     none (skip mapping overloaded procs at all).
+        --conn <conn>                String to connect to database, see tokio_postgres::Config for details. If not
+                                     provided envirment variable SQL_MAP_CONN is checked instead [env:
+                                     SQL_MAP_CONN=""]
+        --use-tuples <use-tuples>    How to use tuples (used by default for just overloads). Options: overloads (the
+                                     default, use tuples to represent function overloading). all (Have all functions
+                                     take a tuple for consitency). none (skip mapping overloaded procs at all).
                                      one_overload (avoid tuples by only mapping the oldest sql proc in the database)
+                                     [default: overloads]
 
 ARGS:
-    <conn-string>    String to connect to database, see tokio_postgres::Config for details
-    <output>         Output file, stdout if not present
+    <output>    Output file, stdout if not present
 ```
 
 ## sql_db_mapper_core
-Contains reexports and helper types which the generated code pulls in
+Contains trait TryFromRow for converting from tokio-postgres Rows to Rust types and implements it for several common types  
+Also contains Interval sturct for corresponding sql type
 
 ## sql_db_mapper_derive
-Features a derive macro from TryFromRow (defined in sql_db_mapper_core) which provides conversions from postgres' Row struct
+Features a derive macro from TryFromRow (defined in sql_db_mapper_core)
 
 ### Future Work
 * more options relating to how the code is generated

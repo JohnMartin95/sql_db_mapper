@@ -6,7 +6,7 @@
 //!
 //! Reexports tokio_postgres::Error as SqlError (the Result::Err of the return from TryFromRow::from_row) and tokio_postgres::row::Row
 
-/// Contains and reexports types that used by the TryFromRow trait
+/// Contains and reexports types that are used by the TryFromRow trait
 pub use tokio_postgres::{
 	Error as SqlError,
 	row::Row,

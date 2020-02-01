@@ -16,6 +16,9 @@ All notable changes to this project will be documented in this file.
 ### Changed
 - Backend of code generation no long uses syn Node instead keeping everything in quote generated TokenStreams
 - `Interval` type now a newtype around time 0.2 Duration (previous was chrono::Druation which was a reexport of time 0.1 Duration)
+- Core no longer reexports its dependencies, instread leaving that up to the generated code to do for itself
+- Output now contains (in a doc comment) what version sql_db_mapper it was generated with and the arguments used
+- connection string is no longer a positional argument and instead uses the option `--conn`. If not provided the env variable SQL_MAP_CONN is also checked
 
 ## 0.0.3 - 2020-01-13
 
