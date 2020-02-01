@@ -8,7 +8,7 @@ use sql_db_mapper::{
 fn main() {
 	let opt = Opt::from_args();
 
-	let conn = Client::connect(&opt.conn_string, NoTls).expect("Failed to connect to database, please check your connection string and try again");
+	let conn = Client::connect(&opt.conn, NoTls).expect("Failed to connect to database, please check your connection string and try again");
 
 	let mut conn = MyClient::new(conn);
 	let full_db = conn.get_all();

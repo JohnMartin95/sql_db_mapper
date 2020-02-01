@@ -48,9 +48,10 @@ pub struct Opt {
 	#[structopt(long, default_value = "overloads")]
 	pub use_tuples : Tuples,
 
-	/// String to connect to database, see tokio_postgres::Config for details
-	#[structopt()]
-	pub conn_string: String,
+	/// String to connect to database, see tokio_postgres::Config for details.
+	/// If not provided envirment variable SQL_MAP_CONN is checked instead
+	#[structopt(long, env = "SQL_MAP_CONN")]
+	pub conn: String,
 
 	/// Output file, stdout if not present
 	#[structopt(parse(from_os_str))]
@@ -134,19 +135,19 @@ postgres-derive = "0.4"
 		dependencies
 	}
 	pub fn get_call_string(&self) -> String {
-		let debug =  if self.debug { " -d" } else { "" };
 		let sync  =  if self.sync  { " -s" } else { "" };
 		let ugly  =  if self.ugly  { " -u" } else { "" };
 		let serde =  if self.serde { " --serde" } else { "" };
 		let dir   =  if self.dir   { " --dir" } else { "" };
 		let formatted = if self.formatted { " -f" } else { "" };
 		let use_tuples =
-		if self.use_tuples == Tuples::ForOverloads { String::new() } else {
-			format!(" --use-tuples {}", self.use_tuples.to_str())
-		};
+			if self.use_tuples == Tuples::ForOverloads {
+				String::new()
+			} else {
+				format!(" --use-tuples {}", self.use_tuples.to_str())
+			};
 		format!(
-			"sql_db_mapper{debug}{sync}{ugly}{serde}{dir}{formatted}{use_tuples} <conn-string>",
-			debug = debug,
+			"sql_db_mapper{sync}{ugly}{serde}{dir}{formatted}{use_tuples}",
 			sync = sync,
 			ugly = ugly,
 			serde = serde,
