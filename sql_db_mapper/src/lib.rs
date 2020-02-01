@@ -56,7 +56,7 @@ pub struct Opt {
 	#[structopt(parse(from_os_str))]
 	pub output: Option<PathBuf>,
 }
-#[derive(Debug, StructOpt, Clone, Copy)]
+#[derive(Debug, StructOpt, Clone, Copy, PartialEq, Eq)]
 pub enum Tuples {
 	ForOverloads,
 	ForAll,
@@ -72,7 +72,17 @@ impl std::str::FromStr for Tuples {
 			"all"          => Ok(Tuples::ForAll),
 			"none"         => Ok(Tuples::NoOverloads),
 			"one_overload" => Ok(Tuples::OldestOverload),
-			_ => Err("Invalid tuple handling option"),
+			_ => Err("Invalid tuple handling option, use one of (overloads, all, none, one_overload)"),
+		}
+	}
+}
+impl Tuples {
+	fn to_str(&self) -> &'static str {
+		match self {
+			Tuples::ForOverloads => "overloads",
+			Tuples::ForAll => "all",
+			Tuples::NoOverloads => "none",
+			Tuples::OldestOverload => "one_overload",
 		}
 	}
 }
@@ -122,6 +132,28 @@ postgres-derive = "0.4"
 		}
 
 		dependencies
+	}
+	pub fn get_call_string(&self) -> String {
+		let debug =  if self.debug { " -d" } else { "" };
+		let sync  =  if self.sync  { " -s" } else { "" };
+		let ugly  =  if self.ugly  { " -u" } else { "" };
+		let serde =  if self.serde { " --serde" } else { "" };
+		let dir   =  if self.dir   { " --dir" } else { "" };
+		let formatted = if self.formatted { " -f" } else { "" };
+		let use_tuples =
+		if self.use_tuples == Tuples::ForOverloads { String::new() } else {
+			format!(" --use-tuples {}", self.use_tuples.to_str())
+		};
+		format!(
+			"sql_db_mapper{debug}{sync}{ugly}{serde}{dir}{formatted}{use_tuples} <conn-string>",
+			debug = debug,
+			sync = sync,
+			ugly = ugly,
+			serde = serde,
+			dir = dir,
+			formatted = formatted,
+			use_tuples = use_tuples,
+		)
 	}
 }
 
