@@ -8,6 +8,7 @@ repository = "https://github.com/JohnMartin95/sql_db_mapper"
 documentation = "https://docs.rs/sql_db_mapper/"
 keywords = ["sql", "orm", "postgres"]
 categories = ["command-line-utilities", "database"]
+readme="README.md"
 edition = "2018"
 
 [dependencies]

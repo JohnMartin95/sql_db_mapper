@@ -48,18 +48,21 @@ ARGS:
 
 ## sql_db_mapper_core
 Contains trait TryFromRow for converting from tokio-postgres Rows to Rust types and implements it for several common types  
-Also contains Interval sturct for corresponding sql type
+Also contains Interval struct for corresponding sql type
 
 ## sql_db_mapper_derive
 Features a derive macro from TryFromRow (defined in sql_db_mapper_core)
 
+When feature full is used exports a macro `sql_db_mapper` which performs the code generation automatically at compile time. Not recommended in general due to effect accessing a database has on compile times.
+
 ### Future Work
 * more options relating to how the code is generated
-	* a derive or other proc_macro version of the code. It may not be recommended for compile time reasons but perhaps somebody would appreciate it
 	* Grab text from `COMMENT ON` and stick it in doc comments
 	* Allow functions that take (for example) an &varchar to take an &str (varchar is a typedef of String so functions would need to be generic like HashMap's get)
 * consider adding support for other popular databases as well
 	* either through connecting to the database as is being currently done or possibly by parsing SQL itself
+* Change TryFromRow so it is auto_implemented for all types that are FromRow
+* Add option for use of TLS connection
 
 ## License
 

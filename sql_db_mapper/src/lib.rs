@@ -8,6 +8,7 @@ pub const VERSION: &str = std::env!("CARGO_PKG_VERSION");
 
 use structopt::StructOpt;
 use std::path::PathBuf;
+use postgres::{Client, NoTls};
 
 #[derive(Debug, StructOpt)]
 #[structopt(
@@ -127,9 +128,9 @@ postgres-derive = "0.4"
 
 		if self.serde {
 			dependencies += "serde = { version = \"1.0\", features = [\"derive\"] }\n";
-			dependencies += "sql_db_mapper_core = { version = \"0.0.2\", features=[\"with_serde\"] }\n";
+			dependencies += "sql_db_mapper_core = { version = \"0.0.4\", features=[\"with_serde\"] }\n";
 		} else {
-			dependencies += "sql_db_mapper_core = \"0.0.2\"\n";
+			dependencies += "sql_db_mapper_core = \"0.0.4\"\n";
 		}
 
 		dependencies
@@ -156,13 +157,19 @@ postgres-derive = "0.4"
 			use_tuples = use_tuples,
 		)
 	}
+
+	pub fn get_client(&self) -> connection::MyClient {
+		let client = Client::connect(&self.conn, NoTls).expect("Failed to connect to database, please check your connection string and try again");
+
+		connection::MyClient::new(client)
+	}
 }
 
 /// Calls rustfmt (the program) on the input
 ///
 /// On any rustfmt error stderr is written to and a copy of the input is returned
 ///
-/// Can panics if acquiring/writing to stdin fails or the the text written to stdout or stderr by rustfmt is not valid utf8
+/// Can panic if acquiring/writing to stdin fails or the the text written to stdout or stderr by rustfmt is not valid utf8
 pub fn format_rust(value: &str) -> String {
 	use std::{
 		process::{

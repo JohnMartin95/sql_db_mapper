@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 - Option for generated types to derive serde Serialize and Deserialize
 - Option for generating mapping as a whole crate directory
 - Option for changing output types, fields, and functions to use rust standard name casing (CamelCase for types and snake_case for fields and functions)
+- macro `sql_db_mapper` to derive which does code generation at compile time
 
 ### Changed
 - Backend of code generation no long uses syn Node instead keeping everything in quote generated TokenStreams
