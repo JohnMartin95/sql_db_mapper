@@ -20,6 +20,8 @@ All notable changes to this project will be documented in this file.
 - Core no longer reexports its dependencies, instread leaving that up to the generated code to do for itself
 - Output now contains (in a doc comment) what version sql_db_mapper it was generated with and the arguments used
 - connection string is no longer a positional argument and instead uses the option `--conn`. If not provided the env variable SQL_MAP_CONN is also checked
+- TryFromSql now takes row by reference
+- Core now provides more impls for TryFromRow and has placed those impls behind fetaure gates
 
 ## 0.0.3 - 2020-01-13
 

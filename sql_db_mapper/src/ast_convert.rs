@@ -632,7 +632,7 @@ fn as_rust_helper(proc : &SqlProc, name : &str, is_overide : bool, opt : &Opt) -
 			let stmt = client.prepare(#call_string_name)#opt_await?;
 			client
 				.query(&stmt, &[#query_params])#opt_await?
-				.into_iter()
+				.iter()
 				.map(#ret_type_name::from_row)
 				.collect()
 		}
@@ -641,6 +641,7 @@ fn as_rust_helper(proc : &SqlProc, name : &str, is_overide : bool, opt : &Opt) -
 			let stmt = client.prepare(#call_string_name)#opt_await?;
 			Ok(client
 				.query_opt(&stmt, &[#query_params])#opt_await?
+				.as_ref()
 				.map(#ret_type_name::from_row)
 				.transpose()?
 			)

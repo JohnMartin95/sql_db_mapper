@@ -61,8 +61,8 @@ When feature full is used exports a macro `sql_db_mapper` which performs the cod
 	* Allow functions that take (for example) an &varchar to take an &str (varchar is a typedef of String so functions would need to be generic like HashMap's get)
 * consider adding support for other popular databases as well
 	* either through connecting to the database as is being currently done or possibly by parsing SQL itself
-* Change TryFromRow so it is auto_implemented for all types that are FromRow
 * Add option for use of TLS connection
+* Arrays in composite types are being incorrectly mapped
 
 ## License
 

@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 //! Connects to a PostgreSQL database and creates a rust module representing all the schemas complete with mappings for stored functions/procedures
 
 mod sql_tree;
@@ -113,16 +114,16 @@ version = "0.1.0"
 edition = "2018"
 
 [dependencies]
-postgres-types = "0.1"
+postgres-types = { version = "0.1", features = ["with-chrono-0_4"] }
 chrono = "0.4"
 rust_decimal = { version = "1.1", features = ["postgres"] }
 postgres-derive = "0.4"
 "#;
 
 		if self.sync {
-			dependencies += "postgres  = { version = \"0.17\", features = [\"with-chrono-0_4\"] }\n";
+			dependencies += "postgres  = \"0.17\"\n";
 		} else {
-			dependencies += "tokio-postgres = { version = \"0.5.1\", features = [\"with-chrono-0_4\"] }\n";
+			dependencies += "tokio-postgres = \"0.5.1\"\n";
 			dependencies += "async-trait = \"0.1.22\"\n";
 		}
 
