@@ -14,7 +14,7 @@ impl FullDB {
 
 /// Database schema. COntains all Types and procedures defined inside
 ///
-/// All sql procures with overloading (the same name) are stored in a Vec the the length of the `procs` Vec is the number of unique procedure names in the schema
+/// All sql procures with overloading (the same name) are stored in a Vec the length of the `procs` Vec is the number of unique procedure names in the schema
 #[derive(Debug, Clone)]
 pub struct Schema {
 	pub id : SchemaId,
@@ -24,11 +24,11 @@ pub struct Schema {
 	pub procs : Vec<Vec<SqlProc>>,
 }
 impl Schema {
-	pub fn add_type(&mut self, typ : PsqlType) {
-		self.types.push(typ);
-	}
-	pub fn append(&mut self, mut all_procs : Vec<Vec<SqlProc>>) {
+	pub fn append_procs(&mut self, mut all_procs : Vec<Vec<SqlProc>>) {
 		self.procs.append(&mut all_procs);
+	}
+	pub fn append_types(&mut self, mut all_types : Vec<PsqlType>) {
+		self.types.append(&mut all_types);
 	}
 }
 
@@ -36,14 +36,13 @@ pub type SchemaId = u32;
 
 #[derive(Debug, Clone)]
 pub struct PsqlType {
-	pub oid : u32,
 	pub name : String,
 	pub ns : SchemaId,
-	pub len : i16,
-	pub by_val : bool,
+	// pub len : i16,
+	// pub by_val : bool,
 	pub typ : PsqlTypType,
-	pub relid : u32,
-	pub align : i8
+	// pub relid : u32,
+	// pub align : i8
 }
 
 #[derive(Debug, Clone)]
@@ -57,16 +56,20 @@ pub enum PsqlTypType {
 	/// pg_type.typtype d
 	Domain(PsqlDomain),
 	/// Types not included above (p, r) Currently ignored but may be used in the future
-	Other
+	Other(u32),
+	/// Used for anonymous tables returned by stored procedure/functions
+	SimpleComposite(NamesAndTypes)
 }
 
 #[derive(Debug, Clone)]
 pub struct PsqlEnumType {
+	pub oid : u32,
 	pub labels : Vec<String>
 }
 
 #[derive(Debug, Clone)]
 pub struct PsqlCompositeType {
+	pub oid : u32,
 	pub cols : Vec<Column>
 }
 
@@ -88,6 +91,7 @@ pub struct PsqlBaseType {
 
 #[derive(Debug, Clone)]
 pub struct PsqlDomain {
+	pub oid : u32,
 	pub base_oid : u32,
 	pub base_name : String,
 	pub base_ns_name : String
@@ -101,25 +105,18 @@ pub struct SqlProc {
 	pub name : String,
 	pub returns_set : bool,
 	pub num_args : i16,
-	pub inputs : Vec<TypeAndName>,
-	pub outputs: ProcOutput,
+	pub inputs : NamesAndTypes,
+	pub outputs: FullType,
 }
+
+#[derive(Debug, Clone)]
+pub struct NamesAndTypes(pub Vec<TypeAndName>);
 
 #[derive(Debug, Clone)]
 pub struct TypeAndName {
 	pub typ : FullType,
 	pub name : String
 }
-
-/// The return type of a procedure
-#[derive(Debug, Clone)]
-pub enum ProcOutput {
-	/// The procedure returns an existing type (columns of a table, user defined enum)
-	Existing(FullType),
-	/// The procedure returns a new anonymous type
-	NewType(Vec<TypeAndName>)
-}
-
 
 #[derive(Debug, Clone)]
 pub struct FullType {

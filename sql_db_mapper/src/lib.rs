@@ -11,6 +11,7 @@ use structopt::StructOpt;
 use std::path::PathBuf;
 use postgres::{Client, NoTls};
 
+/// The program options for the code generation
 #[derive(Debug, StructOpt)]
 #[structopt(
 	name = "sql_db_mapper",
@@ -91,6 +92,7 @@ impl Tuples {
 }
 
 impl Opt {
+	/// Produce the Cargo.toml file contents (the dependecies of the generated code)
 	pub fn get_cargo_toml(&self) -> String {
 		let package_name =
 		if let Some(output_file) = &self.output {
@@ -136,6 +138,8 @@ postgres-derive = "0.4"
 
 		dependencies
 	}
+
+	/// Build a call string that could be used to get the same options
 	pub fn get_call_string(&self) -> String {
 		let sync  =  if self.sync  { " -s" } else { "" };
 		let ugly  =  if self.ugly  { " -u" } else { "" };
@@ -179,7 +183,8 @@ pub fn format_rust(value: &str) -> String {
 		},
 		io::Write,
 	};
-	if let Ok(mut proc) = Command::new("rustfmt").arg("--emit=stdout")
+	if let Ok(mut proc) = Command::new("rustfmt")
+		.arg("--emit=stdout")
 		.arg("--edition=2018")
 		.args(&["--config", "fn_single_line=true,hard_tabs=true,imports_layout=Vertical"])
 		.stdin(Stdio::piped())
