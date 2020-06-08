@@ -23,17 +23,9 @@ pub struct Opt {
 	#[structopt(short, long)]
 	pub debug: bool,
 
-	/// Generate synchronous mapping
-	#[structopt(short, long)]
-	pub sync: bool,
-
 	/// Skip running output through rustfmt
 	#[structopt(short, long)]
 	pub ugly: bool,
-
-	/// Include derives for serde on all generated types
-	#[structopt(long)]
-	pub serde: bool,
 
 	/// Program will treat output as a directory name rather than a file and generate a whole crate. If output is not provided code is printed as usual
 	#[structopt(long)]
@@ -60,6 +52,7 @@ pub struct Opt {
 	#[structopt(parse(from_os_str))]
 	pub output: Option<PathBuf>,
 }
+
 #[derive(Debug, StructOpt, Clone, Copy, PartialEq, Eq)]
 pub enum Tuples {
 	ForOverloads,
@@ -94,21 +87,10 @@ impl Tuples {
 impl Opt {
 	/// Produce the Cargo.toml file contents (the dependecies of the generated code)
 	pub fn get_cargo_toml(&self) -> String {
-		let package_name =
-		if let Some(output_file) = &self.output {
-			// let mut output_file = output_file.clone();
-			if let Some(name) = output_file.file_name() {
-				if let Some(name) = name.to_str() {
-					String::from(name)
-				} else {
-					String::from("my_db_mapping")
-				}
-			} else {
-				String::from("my_db_mapping")
-			}
-		} else {
-			String::from("my_db_mapping")
-		};
+		let package_name = self.output.as_ref()
+			.map(|v| v.file_name()).flatten()
+			.map(|v|v.to_str()).flatten()
+			.unwrap_or("my_db_mapping");
 
 		let mut dependencies = format!("[package]\nname = \"{}\"", package_name);
 		dependencies += r#"
@@ -116,34 +98,33 @@ version = "0.1.0"
 edition = "2018"
 
 [dependencies]
-postgres-types = { version = "0.1", features = ["with-chrono-0_4"] }
+sql_db_mapper_core = "0.0.4"
+postgres-types = { version = "0.1", features = ["derive", "with-chrono-0_4"] }
 chrono = "0.4"
-rust_decimal = { version = "1.1", features = ["postgres"] }
+#version 1.6 of rust_decimal isn't compiling
+rust_decimal = { version = ">= 1.2, < 1.5", features = ["postgres"] }
 postgres-derive = "0.4"
+
+postgres  = { version = "0.17", optional = true }
+tokio-postgres = { version = "0.5.1", optional = true }
+async-trait = { version = "0.1.22", optional = true }
+
+serde = { version = "1.0", features = ["derive"], optional = true }
+
+[features]
+with_serde = ["serde", "sql_db_mapper_core/with_serde"]
+sync = ["postgres"]
+async = ["tokio-postgres", "async-trait"]
 "#;
-
-		if self.sync {
-			dependencies += "postgres  = \"0.17\"\n";
-		} else {
-			dependencies += "tokio-postgres = \"0.5.1\"\n";
-			dependencies += "async-trait = \"0.1.22\"\n";
-		}
-
-		if self.serde {
-			dependencies += "serde = { version = \"1.0\", features = [\"derive\"] }\n";
-			dependencies += "sql_db_mapper_core = { version = \"0.0.4\", features=[\"with_serde\"] }\n";
-		} else {
-			dependencies += "sql_db_mapper_core = \"0.0.4\"\n";
-		}
 
 		dependencies
 	}
 
 	/// Build a call string that could be used to get the same options
 	pub fn get_call_string(&self) -> String {
-		let sync  =  if self.sync  { " -s" } else { "" };
+		// let sync  =  if self.sync  { " -s" } else { "" };
 		let ugly  =  if self.ugly  { " -u" } else { "" };
-		let serde =  if self.serde { " --serde" } else { "" };
+		// let serde =  if self.serde { " --serde" } else { "" };
 		let dir   =  if self.dir   { " --dir" } else { "" };
 		let formatted = if self.formatted { " -f" } else { "" };
 		let use_tuples =
@@ -153,10 +134,10 @@ postgres-derive = "0.4"
 				format!(" --use-tuples {}", self.use_tuples.to_str())
 			};
 		format!(
-			"sql_db_mapper{sync}{ugly}{serde}{dir}{formatted}{use_tuples}",
-			sync = sync,
+			"sql_db_mapper{ugly}{dir}{formatted}{use_tuples}",
+			// sync = sync,
 			ugly = ugly,
-			serde = serde,
+			// serde = serde,
 			dir = dir,
 			formatted = formatted,
 			use_tuples = use_tuples,
@@ -186,7 +167,7 @@ pub fn format_rust(value: &str) -> String {
 	if let Ok(mut proc) = Command::new("rustfmt")
 		.arg("--emit=stdout")
 		.arg("--edition=2018")
-		.args(&["--config", "fn_single_line=true,hard_tabs=true,imports_layout=Vertical"])
+		.args(&["--config", "fn_single_line=true,hard_tabs=true,imports_layout=Vertical,reorder_imports=false,reorder_modules=false"])
 		.stdin(Stdio::piped())
 		.stdout(Stdio::piped())
 		.stderr(Stdio::piped())

@@ -60,7 +60,7 @@ use proc_macro2::TokenStream;
 /// 	//impls for other input params
 /// }
 /// ```
-pub fn proc_to_rust(proc : &[SqlProc], opt : &Opt) -> TokenStream {
+pub fn proc_to_rust(proc : &[SqlProc], opt : &Opt, is_sync : bool) -> TokenStream {
 	if proc.len() == 0 {
 		if opt.debug { println!("Error; retrieved an empty Vec of SqlProcs") };
 		return quote!{  };
@@ -69,30 +69,30 @@ pub fn proc_to_rust(proc : &[SqlProc], opt : &Opt) -> TokenStream {
 	match opt.use_tuples {
 		Tuples::ForOverloads => {
 			if proc.len() == 1 {
-				single_proc_to_rust(&proc[0], &proc[0].name, false, opt)
+				single_proc_to_rust(&proc[0], &proc[0].name, false, opt, is_sync)
 			} else {
-				to_many_fns(proc, opt)
+				to_many_fns(proc, opt, is_sync)
 			}
 		},
 		Tuples::ForAll => {
-			to_many_fns(proc, opt)
+			to_many_fns(proc, opt, is_sync)
 		},
 		Tuples::NoOverloads => {
 			if proc.len() == 1 {
-				single_proc_to_rust(&proc[0], &proc[0].name, false, opt)
+				single_proc_to_rust(&proc[0], &proc[0].name, false, opt, is_sync)
 			} else {
 				if opt.debug { println!("Overloaded Proc: '{}' not mapped", proc[0].name) };
 				quote!{  }
 			}
 		},
 		Tuples::OldestOverload => {
-			single_proc_to_rust(&proc[0], &proc[0].name, false, opt)
+			single_proc_to_rust(&proc[0], &proc[0].name, false, opt, is_sync)
 		},
 	}
 }
 
 /// Turns an overloaded SQL function to a rough equicvalent in rust
-fn to_many_fns(procs : &[SqlProc], opt:&Opt) -> TokenStream {
+fn to_many_fns(procs : &[SqlProc], opt:&Opt, is_sync : bool) -> TokenStream {
 	let name_type = format_heck(&procs[0].name, opt, SnakeCase);
 	let doc_comments = to_overload_doc(&procs, opt);
 	let fn_docs = quote!{
@@ -103,7 +103,7 @@ fn to_many_fns(procs : &[SqlProc], opt:&Opt) -> TokenStream {
 	};
 
 	// output type depending on wether the code is async
-	let fn_code = if opt.sync {
+	let fn_code = if is_sync {
 		quote!{
 			#fn_docs
 			pub fn #name_type<T:#name_type::OverloadTrait>(input : T) -> T::Output {
@@ -121,7 +121,7 @@ fn to_many_fns(procs : &[SqlProc], opt:&Opt) -> TokenStream {
 		}
 	};
 
-	let (is_async_trait, async_fn) = if opt.sync {
+	let (is_async_trait, async_fn) = if is_sync {
 		(
 			quote!{ },
 			quote!{ },
@@ -136,7 +136,7 @@ fn to_many_fns(procs : &[SqlProc], opt:&Opt) -> TokenStream {
 		)
 	};
 
-	let trait_impls = procs.iter().enumerate().map(|(i,p)| to_trait_impl(i, p, opt));
+	let trait_impls = procs.iter().enumerate().map(|(i,p)| to_trait_impl(i, p, opt, is_sync));
 
 	quote!{
 		#fn_code
@@ -153,24 +153,25 @@ fn to_many_fns(procs : &[SqlProc], opt:&Opt) -> TokenStream {
 }
 
 /// For overloaded functions get the function implementation
-fn to_trait_impl(index : usize, proc : &SqlProc, opt : &Opt) -> TokenStream {
+fn to_trait_impl(index : usize, proc : &SqlProc, opt : &Opt, is_sync : bool) -> TokenStream {
 	//build SQL string to call proc
 	let new_name = format!("{}{}", proc.name, index);
-	single_proc_to_rust(proc, &new_name, true, opt)
+	single_proc_to_rust(proc, &new_name, true, opt, is_sync)
 }
 /// gets the type of the input to one variant for an overloaded function
-fn to_tuple_type(types : &[TypeAndName], opt : &Opt) -> TokenStream {
+fn to_tuple_type(types : &[TypeAndName], opt : &Opt, is_sync : bool) -> TokenStream {
 	let tuple_middle = types.iter().map(|tan| {
 		let tmp = tan.typ.to_tokens(opt);
-		quote!{ &'a super::#tmp }
+		quote!{ &'a #tmp }
 	});
 
-	if opt.sync {
+	if is_sync {
 		quote!{ (&'a mut Client, #(#tuple_middle),* ) }
 	} else {
 		quote!{ (&'a Client, #(#tuple_middle),* ) }
 	}
 }
+
 fn to_tuple_pattern(types : &[TypeAndName], opt : &Opt) -> TokenStream {
 	let tuple_middle = types.iter().map(|tan| {
 		format_heck(&tan.name, opt, SnakeCase)
@@ -199,7 +200,7 @@ fn to_overload_doc(procs : &[SqlProc], opt:&Opt) -> TokenStream {
 }
 
 
-fn single_proc_to_rust(proc : &SqlProc, name : &str, is_overide : bool, opt : &Opt) -> TokenStream {
+fn single_proc_to_rust(proc : &SqlProc, name : &str, is_overide : bool, opt : &Opt, is_sync : bool) -> TokenStream {
 	let name_type = format_heck(name, opt, SnakeCase);
 
 	//build SQL string to call proc
@@ -215,11 +216,7 @@ fn single_proc_to_rust(proc : &SqlProc, name : &str, is_overide : bool, opt : &O
 			return quote!{};
 		} else {
 			let typ = proc.outputs.to_tokens(opt);
-			if is_overide {
-				quote!{ super::#typ }
-			} else {
-				quote!{ #typ }
-			}
+			quote!{ #typ }
 		};
 	//get the return type properly wrapped in a Vec or Option
 	let new_ret_type_name =
@@ -232,7 +229,7 @@ fn single_proc_to_rust(proc : &SqlProc, name : &str, is_overide : bool, opt : &O
 	let func_params = proc.inputs.as_function_params(opt);
 	let query_params = as_query_params(&proc.inputs.0, opt);
 
-	let (opt_async, opt_await, is_async_trait, client_type) = if opt.sync {
+	let (opt_async, opt_await, is_async_trait, client_type) = if is_sync {
 		(quote!{  }, quote!{  }, quote!{  }, quote!{ &mut Client })
 	} else {
 		(quote!{ async }, quote!{ .await }, quote!{ #[async_trait] }, quote!{ &Client })
@@ -262,7 +259,7 @@ fn single_proc_to_rust(proc : &SqlProc, name : &str, is_overide : bool, opt : &O
 	//the wrappings on the body
 	let func_text =
 	if is_overide {
-		let tuple_type = to_tuple_type(&proc.inputs.0, opt);
+		let tuple_type = to_tuple_type(&proc.inputs.0, opt, is_sync);
 		let tuple_pattern = to_tuple_pattern(&proc.inputs.0, opt);
 		quote!{
 			#is_async_trait

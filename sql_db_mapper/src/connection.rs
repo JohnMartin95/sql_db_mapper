@@ -306,14 +306,14 @@ impl MyClient {
 
 			FullType{ schema : nspname, name : typename }
 		} else {
-			FullType{ schema : ns_name.clone(), name : name.clone() }
+			FullType{ schema : ns_name.clone(), name : format!("{}Return", name) }
 		};
 
 		let anon_ret_type = if outputs.0.is_empty() {
 			None
 		} else {
 			Some(PsqlType{
-				name : name.clone(),
+				name : format!("{}Return", name),
 				ns : ns_oid,
 				typ : PsqlTypType::SimpleComposite(outputs)
 			})

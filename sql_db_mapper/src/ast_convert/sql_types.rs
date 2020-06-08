@@ -74,7 +74,7 @@ pub fn enum_to_ast(e : &PsqlEnumType, name : &str, opt : &Opt) -> TokenStream {
 		.map(|v| {
 			format_heck(v, opt, CamelCase)
 		});
-	let derives = get_derives(opt.serde);
+	let derives = get_derives();
 
 	quote!{
 		#derives
@@ -100,7 +100,7 @@ pub fn composite_to_ast(c : &PsqlCompositeType, name : &str, opt : &Opt) -> Toke
 				quote!{ pub #field_name : Option<super::#schema_name::#type_name> }
 			}
 		});
-	let derives = get_derives(opt.serde);
+	let derives = get_derives();
 
 	quote!{
 		#derives
@@ -142,7 +142,7 @@ pub fn domain_to_ast(b : &PsqlDomain, name : &str, opt : &Opt) ->  TokenStream {
 	let name_type   = format_heck(name, opt, CamelCase);
 	let schema_name = format_heck(&b.base_ns_name, opt, SnakeCase);
 	let type_name   = format_heck(&b.base_name, opt, CamelCase);
-	let derives = get_derives(opt.serde);
+	let derives = get_derives();
 
 	quote!{
 		#derives
@@ -152,7 +152,7 @@ pub fn domain_to_ast(b : &PsqlDomain, name : &str, opt : &Opt) ->  TokenStream {
 
 /// creates the syn node for a struct for the anon return type of a function
 pub fn simple_composite_to_ast(c : &NamesAndTypes, name : &str, opt : &Opt) -> TokenStream {
-	let struct_name = format_heck(&format!("{}Return", name), opt, CamelCase);
+	let struct_name = format_heck(name, opt, CamelCase);
 	let struct_body = c.0.iter()
 		.map(|tan| -> TokenStream {
 			let field_name = format_heck(&tan.name, opt, SnakeCase);
@@ -161,7 +161,7 @@ pub fn simple_composite_to_ast(c : &NamesAndTypes, name : &str, opt : &Opt) -> T
 				pub #field_name : #type_name
 			}
 		});
-	let derives = get_derives(opt.serde);
+	let derives = get_derives();
 
 	quote!{
 		#derives
@@ -172,10 +172,9 @@ pub fn simple_composite_to_ast(c : &NamesAndTypes, name : &str, opt : &Opt) -> T
 }
 
 
-fn get_derives(serde : bool) -> TokenStream {
-	if serde {
-		quote!{ #[derive(Debug, Clone, TryFromRow, ToSql, FromSql, Serialize, Deserialize)] }
-	} else {
-		quote!{ #[derive(Debug, Clone, TryFromRow, ToSql, FromSql)] }
+fn get_derives() -> TokenStream {
+	quote!{
+		#[cfg_attr(feature = "with_serde", derive(Serialize, Deserialize))]
+		#[derive(Debug, Clone, TryFromRow, ToSql, FromSql)]
 	}
 }
