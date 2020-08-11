@@ -29,7 +29,7 @@ WHERE typnamespace = $1 AND
 ORDER BY oid ASC";
 
 const GET_ENUM : &str =
-"SELECT oid, *
+"SELECT oid, enumtypid, enumsortorder, enumlabel
 FROM pg_enum
 WHERE enumtypid = $1
 ORDER BY enumsortorder ASC";
