@@ -21,16 +21,15 @@ USAGE:
     sql_db_mapper [FLAGS] [OPTIONS] --conn <conn> [output]
 
 FLAGS:
-    -d, --debug        Activate debug mode
-        --dir          Program will treat output as a directory name rather than a file and generate a whole crate. If
-                       output is not provided code is printed as usual
-    -f, --formatted    Convert names from the database to rust standard (i.e. table names in CamelCase, fields and
-                       functions in snake_case)
-    -h, --help         Prints help information
-        --serde        Include derives for serde on all generated types
-    -s, --sync         Generate synchronous mapping
-    -u, --ugly         Skip running output through rustfmt
-    -V, --version      Prints version information
+    -d, --debug           Activate debug mode
+        --dir             Program will treat output as a directory name rather than a file and generate a whole crate.
+                          If output is not provided code is printed as usual
+    -f, --formatted       Convert names from the database to rust standard (i.e. table names in CamelCase, fields and
+                          functions in snake_case)
+    -h, --help            Prints help information
+        --no-functions    Only make mappings for tables and views
+    -u, --ugly            Skip running output through rustfmt
+    -V, --version         Prints version information
 
 OPTIONS:
         --conn <conn>                String to connect to database, see tokio_postgres::Config for details. If not

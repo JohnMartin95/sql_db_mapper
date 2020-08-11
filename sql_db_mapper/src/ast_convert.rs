@@ -90,7 +90,6 @@ impl FullDB {
 
 		//generate Cargo.toml
 		let toml_path = path_push_helper(&output_file, "Cargo.toml");
-
 		File::create(toml_path)
 			.expect("failed to create Cargo.toml")
 			.write_all(toml_content.as_bytes())
@@ -102,70 +101,70 @@ impl FullDB {
 
 		//generate lib.rs file
 		let lib_rs = path_push_helper(&output_file, "lib.rs");
-		let tmp = self.to_rust_tokens(opt);
-		println!("\n{}", tmp);
-		let format_tmp = maybe_format(&tmp, &opt);
-		println!("\n{}\n", format_tmp);
 		File::create(lib_rs)
 			.unwrap()
 			.write_all(
-				format_tmp.as_bytes()
+				maybe_format(&self.to_rust_tokens(opt), &opt).as_bytes()
 				// maybe_format(&self.to_rust_tokens(opt), &opt).as_bytes()
 			).expect("failed to write to file");
 
-		//generate types.rs file
+		//generate types.rs file and types folder
 		let types_rs = path_push_helper(&output_file, "types.rs");
 		File::create(types_rs).unwrap()
 			.write_all(
 				maybe_format(&self.types_content(opt), &opt).as_bytes()
 			).expect("failed to write to file");
-
-		//generate sync_fns.rs file
-		let sync_rs = path_push_helper(&output_file, "sync_fns.rs");
-		File::create(sync_rs).unwrap()
-			.write_all(
-				maybe_format(&self.sync_content(opt), &opt).as_bytes()
-			).expect("failed to write to file");
-
-		//generate async_fns.rs file
-		let async_rs = path_push_helper(&output_file, "async_fns.rs");
-		File::create(async_rs).unwrap()
-			.write_all(
-				maybe_format(&self.async_content(opt), &opt).as_bytes()
-			).expect("failed to write to file");
-
 		let types_folder = path_push_helper(&output_file, "types/");
 		std::fs::create_dir_all(&types_folder).unwrap();
 
 		let sync_folder = path_push_helper(&output_file, "sync_fns/");
-		std::fs::create_dir_all(&sync_folder).unwrap();
-
 		let async_folder = path_push_helper(&output_file, "async_fns/");
-		std::fs::create_dir_all(&async_folder).unwrap();
+
+		//generate sync/async files and folders
+		if !opt.no_functions {
+			//generate sync_fns.rs file/folder
+			let sync_rs = path_push_helper(&output_file, "sync_fns.rs");
+			File::create(sync_rs).unwrap()
+			.write_all(
+				maybe_format(&self.sync_content(opt), &opt).as_bytes()
+			).expect("failed to write to file");
+			std::fs::create_dir_all(&sync_folder).unwrap();
+
+			//generate async_fns.rs file/folder
+			let async_rs = path_push_helper(&output_file, "async_fns.rs");
+			File::create(async_rs).unwrap()
+			.write_all(
+				maybe_format(&self.async_content(opt), &opt).as_bytes()
+			).expect("failed to write to file");
+			std::fs::create_dir_all(&async_folder).unwrap();
+		}
+
 
 		// make file for each schema's module
 		for schema in &self.schemas {
 			let file_name = format!("{}.rs", schema.name);
 
 			let schema_t  = path_push_helper(&types_folder, &file_name);
-			let schema_s  = path_push_helper(&sync_folder, &file_name);
-			let schema_a  = path_push_helper(&async_folder, &file_name);
-
 
 			File::create(schema_t).unwrap()
 				.write_all(
 					maybe_format(&schema.types_content(opt), &opt).as_bytes()
 				).expect("failed to write to file");
 
-			File::create(schema_s).unwrap()
+			if !opt.no_functions {
+				let schema_s  = path_push_helper(&sync_folder, &file_name);
+				let schema_a  = path_push_helper(&async_folder, &file_name);
+
+				File::create(schema_s).unwrap()
 				.write_all(
 					maybe_format(&schema.funcs_content(opt, true), &opt).as_bytes()
 				).expect("failed to write to file");
 
-			File::create(schema_a).unwrap()
+				File::create(schema_a).unwrap()
 				.write_all(
 					maybe_format(&schema.funcs_content(opt, false), &opt).as_bytes()
 				).expect("failed to write to file");
+			}
 
 
 		}
@@ -230,38 +229,51 @@ impl FullDB {
 
 	/// The tokens for FullDb when the whole mapping is being made into one file
 	fn to_flat_tokens(&self, opt: &Opt) -> TokenStream {
-		let types_tokens = self.types_content(opt);
-		let sync_tokens  = self.sync_content(opt);
-		let async_tokens = self.async_content(opt);
-
 		let opt_tokens = crate_root_start(opt);
 
-		quote!{
-			#opt_tokens
+		let types_tokens = self.types_content(opt);
+		if opt.no_functions {
+			quote!{
+				#opt_tokens
 
-			pub mod types{ use super::*; #types_tokens }
-			#[cfg(feature = "sync")]
-			pub mod sync_fns{ use super::*; #sync_tokens }
-			#[cfg(feature = "async")]
-			pub mod async_fns{ use super::*; #async_tokens }
+				pub mod types{ use super::*; #types_tokens }
+			}
+		} else {
+			let sync_tokens  = self.sync_content(opt);
+			let async_tokens = self.async_content(opt);
+
+			quote!{
+				#opt_tokens
+
+				pub mod types{ use super::*; #types_tokens }
+				#[cfg(feature = "sync")]
+				pub mod sync_fns{ use super::*; #sync_tokens }
+				#[cfg(feature = "async")]
+				pub mod async_fns{ use super::*; #async_tokens }
+			}
 		}
 	}
 
 	/// The tokens for FullDb when a directory structure is being created
 	fn to_dir_tokens(&self, opt: &Opt) -> TokenStream {
 		let opt_tokens = crate_root_start(opt);
-		let tmp =
-		quote!{
-			#opt_tokens
+		if opt.no_functions {
+			quote!{
+				#opt_tokens
 
-			pub mod types;
-			#[cfg(feature = "sync")]
-			pub mod sync_fns;
-			#[cfg(feature = "async")]
-			pub mod async_fns;
-		};
-		println!("{}", tmp.to_string());
-		tmp
+				pub mod types;
+			}
+		} else {
+			quote!{
+				#opt_tokens
+
+				pub mod types;
+				#[cfg(feature = "sync")]
+				pub mod sync_fns;
+				#[cfg(feature = "async")]
+				pub mod async_fns;
+			}
+		}
 	}
 }
 fn path_push_helper(path : &std::path::PathBuf, extention : &str) -> std::path::PathBuf {
@@ -346,6 +358,12 @@ fn crate_root_start(opt : &Opt) -> TokenStream {
 			#![allow(non_camel_case_types)]
 		}
 	};
+	//if no functions reexport the types at the top level for convenience 
+	let reexports = if opt.no_functions {
+		quote!{ pub use types::*; }
+	} else {
+		quote!{}
+	};
 
 	let doc_str = format!("Generated by sql_db_mapper version={}", super::VERSION );
 	let call_params = format!("Called with arguments `{}`", opt.get_call_string());
@@ -358,5 +376,6 @@ fn crate_root_start(opt : &Opt) -> TokenStream {
 		#fixed_case
 		pub use sql_db_mapper_core as orm;
 		use orm::*;
+		#reexports
 	}
 }

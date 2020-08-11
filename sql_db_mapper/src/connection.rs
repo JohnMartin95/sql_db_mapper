@@ -189,7 +189,7 @@ impl MyClient {
 		}
 	}
 
-	pub fn get_all(&mut self) -> FullDB {
+	pub fn get_all(&mut self, no_functions : bool) -> FullDB {
 		let mut full_db = FullDB {schemas : Vec::new()};
 
 		// gets all the schemas in the current db
@@ -199,10 +199,12 @@ impl MyClient {
 			//get all types and tables
 			let types = self.get_types(schema.id);
 			schema.append_types(types);
-			//get all stored procedures/functions
-			let (procs, types2) = self.get_procedures(schema.id);
-			schema.append_procs(procs);
-			schema.append_types(types2);
+			//get all stored procedures/functions (if required)
+			if !no_functions {
+				let (procs, types2) = self.get_procedures(schema.id);
+				schema.append_procs(procs);
+				schema.append_types(types2);
+			}
 
 			//add everything to the schema object
 			full_db.add_schema(schema);

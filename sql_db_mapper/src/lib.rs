@@ -35,6 +35,10 @@ pub struct Opt {
 	#[structopt(short, long)]
 	pub formatted: bool,
 
+	/// Only make mappings for tables and views
+	#[structopt(long)]
+	pub no_functions: bool,
+
 	/// How to use tuples (used by default for just overloads). Options:
 	/// overloads (the default, use tuples to represent function overloading).
 	/// all (Have all functions take a tuple for consitency).
