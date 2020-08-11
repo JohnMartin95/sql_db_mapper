@@ -32,12 +32,23 @@ use Case::*;
 fn format_heck(name : &str, opt:&Opt, case : Case) -> proc_macro2::Ident {
 	if opt.formatted {
 		match case {
-			SnakeCase   => format_ident!("{}", name.to_snake_case()),
-			CamelCase   => format_ident!("{}", name.to_camel_case()),
-			ShoutySnake => format_ident!("{}", name.to_shouty_snake_case()),
+			SnakeCase   => format_ident_h(&name.to_snake_case()),
+			CamelCase   => format_ident_h(&name.to_camel_case()),
+			ShoutySnake => format_ident_h(&name.to_shouty_snake_case()),
 		}
 	} else {
-		format_ident!("{}", name)
+		format_ident_h(name)
+	}
+}
+fn format_ident_h(s : &str) -> proc_macro2::Ident {
+	if let Some(c) = s.chars().next() {
+		if c.is_ascii_digit() {
+			format_ident!("_{}", s)
+		} else {
+			format_ident!("{}", s)
+		}
+	} else {
+		panic!("formatted identifier should not be empty")
 	}
 }
 
