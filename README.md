@@ -59,7 +59,6 @@ When feature full is used exports a macro `sql_db_mapper` which performs the cod
 * more options relating to how the code is generated
 	* Grab text from `COMMENT ON` and stick it in doc comments
 	* Allow functions that take (for example) an &varchar to take an &str (varchar is a typedef of String so functions would need to be generic like HashMap's get)
-	* generate both sync and async functions in one crate (using the same types)
 * consider adding support for other popular databases as well
 	* either through connecting to the database as is being currently done or possibly by parsing SQL itself
 * Add option for use of TLS connection
