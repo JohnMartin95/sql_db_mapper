@@ -357,5 +357,6 @@ fn crate_root_start(opt : &Opt) -> TokenStream {
 		#![allow(unused_imports)]
 		#fixed_case
 		pub use sql_db_mapper_core as orm;
+		use orm::*;
 	}
 }
