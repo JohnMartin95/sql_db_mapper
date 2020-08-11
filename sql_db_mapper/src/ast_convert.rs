@@ -239,11 +239,11 @@ impl FullDB {
 		quote!{
 			#opt_tokens
 
-			pub mod types{ #types_tokens }
+			pub mod types{ use super::*; #types_tokens }
 			#[cfg(feature = "sync")]
-			pub mod sync_fns{ #sync_tokens }
+			pub mod sync_fns{ use super::*; #sync_tokens }
 			#[cfg(feature = "async")]
-			pub mod async_fns{ #async_tokens }
+			pub mod async_fns{ use super::*; #async_tokens }
 		}
 	}
 
