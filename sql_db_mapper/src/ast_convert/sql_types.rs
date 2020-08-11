@@ -115,12 +115,12 @@ pub fn base_to_ast(b : &PsqlBaseType, opt : &Opt) -> TokenStream {
 	let name_type = format_heck(&b.name, opt, CamelCase);
 
 	let oid_type = match b.oid {
-		16 => quote!{ bool },
+		16 => quote!{ std::primitive::bool },
 		17 => quote!{ Vec<u8> },
 		20 => quote!{ i64 },
 		23 => quote!{ i32 },
 		26 => quote!{ u32 },
-		25 | 1042 | 1043 => quote!{ String },
+		19 | 25 | 1042 | 1043 => quote!{ String },
 		1082 => quote!{ chrono::NaiveDate },
 		1114 => quote!{ chrono::NaiveDateTime },
 		1184 => quote!{ chrono::DateTime<chrono::Utc> },
