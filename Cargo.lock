@@ -874,6 +874,8 @@ version = "1.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c9e81662973c7a8d9663e64a0de4cd642b89a21d64966e3d99606efdc5fb0cc6"
 dependencies = [
+ "byteorder",
+ "bytes 0.5.6",
  "num-traits",
  "postgres 0.17.5",
  "serde",
@@ -1017,7 +1019,7 @@ name = "sql_db_mapper_core"
 version = "0.0.4"
 dependencies = [
  "bit-vec",
- "bytes 0.6.0",
+ "bytes 0.5.6",
  "chrono",
  "eui48 1.1.0",
  "geo-types 0.6.2",

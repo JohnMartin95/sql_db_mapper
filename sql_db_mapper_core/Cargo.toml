@@ -19,7 +19,7 @@ postgres-types = { version = "0.1" }
 # derives
 sql_db_mapper_derive = { path = "../sql_db_mapper_derive", version = "0.0.4" }
 # crates with types that implement FromSql
-rust_decimal = { version = "1.8", features = ["postgres"], optional = true }
+rust_decimal = { version = "1.8", features = ["db-postgres"], optional = true }
 time       = { version = "0.2", optional = true }
 bit-vec    = { version = "0.6", optional = true }
 chrono     = { version = "0.4", optional = true }
@@ -28,7 +28,7 @@ geo-types  = { version = "0.6", optional = true }
 serde_json = { version = "1.0", optional = true }
 uuid       = { version = "0.8", optional = true }
 # used by ToSql
-bytes = "0.6"
+bytes = "0.5.6"
 # serde
 serde = { version = "1.0", optional = true }
 
