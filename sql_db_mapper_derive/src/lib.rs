@@ -10,16 +10,11 @@
 
 extern crate proc_macro;
 
-use proc_macro2::{
-	TokenStream,
-};
+use proc_macro2::TokenStream;
 
 use quote::quote;
 
-use syn::{
-	parse_macro_input,
-	DeriveInput,
-};
+use syn::{parse_macro_input, DeriveInput};
 
 #[proc_macro_derive(TryFromRow)]
 /// A derive macro for [`TryFromRow`] which converts from a [`tokio-postgres::Row`]
@@ -43,30 +38,33 @@ pub fn try_from_tokio_postgres_row(input: proc_macro::TokenStream) -> proc_macro
 						row.try_get(0)
 					}
 				}
-			}.into();
+			}
+			.into();
 		},
 		syn::Data::Union(_) => panic!("Cannot derive TryFromRow automatically for union types"),
 	};
 
 	let from_row_code = match fields {
 		syn::Fields::Named(_) => {
-			let tmp : TokenStream = fields
+			let tmp: TokenStream = fields
 				.iter()
 				.map(|v| v.ident.as_ref().unwrap())
 				.enumerate()
-				.map(|(i,v)| {
-					quote!{ #v : row.try_get(#i)?, }
-				}).collect();
-			quote!{ Ok(Self { #tmp }) }
+				.map(|(i, v)| {
+					quote! { #v : row.try_get(#i)?, }
+				})
+				.collect();
+			quote! { Ok(Self { #tmp }) }
 		},
 		syn::Fields::Unnamed(_) => {
-			let tmp : TokenStream = fields
+			let tmp: TokenStream = fields
 				.iter()
 				.enumerate()
-				.map(|(i,_v)| {
-					quote!{ row.try_get(#i)?, }
-				}).collect();
-			quote!{ Ok(Self ( #tmp )) }
+				.map(|(i, _v)| {
+					quote! { row.try_get(#i)?, }
+				})
+				.collect();
+			quote! { Ok(Self ( #tmp )) }
 		},
 		syn::Fields::Unit => {
 			return quote! {
@@ -75,7 +73,8 @@ pub fn try_from_tokio_postgres_row(input: proc_macro::TokenStream) -> proc_macro
 						Ok(Self)
 					}
 				}
-			}.into();
+			}
+			.into();
 		},
 	};
 
@@ -94,31 +93,24 @@ pub fn try_from_tokio_postgres_row(input: proc_macro::TokenStream) -> proc_macro
 #[cfg(feature = "full")]
 mod full_derive {
 	use syn::{
+		parse::{Parse, ParseStream},
 		punctuated::Punctuated,
-		LitStr,
 		token::Comma,
-		parse::{
-			Parse,
-			ParseStream,
-		},
+		LitStr,
 		Result,
 	};
 
-	pub struct MyStruct{
-		pub args : Vec<String>
+	pub struct MyStruct {
+		pub args: Vec<String>,
 	}
 	impl Parse for MyStruct {
 		fn parse(input: ParseStream) -> Result<Self> {
-			let ast_node : Punctuated<LitStr, Comma> = Punctuated::parse_terminated(input)?;
-			let mut args : Vec<_> = ast_node.iter()
-				.map(LitStr::value)
-				.collect();
+			let ast_node: Punctuated<LitStr, Comma> = Punctuated::parse_terminated(input)?;
+			let mut args: Vec<_> = ast_node.iter().map(LitStr::value).collect();
 			// StructOpt effectively ignores the first argument
 			args.insert(0, String::from("sql_db_mapper"));
 
-			Ok(MyStruct{
-				args
-			})
+			Ok(MyStruct { args })
 		}
 	}
 }
@@ -137,8 +129,8 @@ mod full_derive {
 /// [`sql_db_mapper`]: https://docs.rs/sql_db_mapper/0.0.4/sql_db_mapper/
 #[proc_macro]
 pub fn sql_db_mapper(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
-	use sql_db_mapper::*;
 	use ast_convert::ConvertToAst;
+	use sql_db_mapper::*;
 	use structopt::StructOpt;
 
 	// let test : MyStruct = parse(item).unwrap();
@@ -155,9 +147,10 @@ pub fn sql_db_mapper(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
 	let mut client = opt.get_client();
 	let full_db = client.get_all();
 	let tokens = full_db.to_rust_tokens(&opt);
-	(quote!{
+	(quote! {
 		pub mod db {
 			#tokens
 		}
-	}).into()
+	})
+	.into()
 }

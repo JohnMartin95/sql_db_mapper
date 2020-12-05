@@ -1,25 +1,13 @@
 //! Turn the AST of the database from sql_tree into a Rust syntax tree fron syn
 
-use std::{
-	fs::File,
-	io::Write
-};
-use super::{
-	sql_tree::*,
-	Opt,
-	format_rust,
-};
-use quote::{
-	quote,
-	format_ident,
-};
-use proc_macro2::{
-	TokenStream,
-};
+use super::{format_rust, sql_tree::*, Opt};
 use heck::*;
+use proc_macro2::TokenStream;
+use quote::{format_ident, quote};
+use std::{fs::File, io::Write};
 
-mod sql_types;
 mod sql_procs;
+mod sql_types;
 
 /// Type of capitalization to do with heck
 enum Case {
@@ -29,18 +17,18 @@ enum Case {
 }
 use Case::*;
 /// Optionally do capitalization
-fn format_heck(name : &str, opt:&Opt, case : Case) -> proc_macro2::Ident {
+fn format_heck(name: &str, opt: &Opt, case: Case) -> proc_macro2::Ident {
 	if opt.formatted {
 		match case {
-			SnakeCase   => format_ident_h(&name.to_snake_case()),
-			CamelCase   => format_ident_h(&name.to_camel_case()),
+			SnakeCase => format_ident_h(&name.to_snake_case()),
+			CamelCase => format_ident_h(&name.to_camel_case()),
 			ShoutySnake => format_ident_h(&name.to_shouty_snake_case()),
 		}
 	} else {
 		format_ident_h(name)
 	}
 }
-fn format_ident_h(s : &str) -> proc_macro2::Ident {
+fn format_ident_h(s: &str) -> proc_macro2::Ident {
 	if let Some(c) = s.chars().next() {
 		if c.is_ascii_digit() {
 			format_ident!("_{}", s)
@@ -53,7 +41,7 @@ fn format_ident_h(s : &str) -> proc_macro2::Ident {
 }
 
 /// Optionally Format the tokens with rustfmt
-fn maybe_format(input : &TokenStream, opt : &Opt) -> String {
+fn maybe_format(input: &TokenStream, opt: &Opt) -> String {
 	let output = input.to_string();
 	if opt.ugly {
 		output
@@ -64,7 +52,7 @@ fn maybe_format(input : &TokenStream, opt : &Opt) -> String {
 
 impl FullDB {
 	//writes the output text to either a file, directory, or stdout
-	pub fn make_output(&self, opt : &Opt) {
+	pub fn make_output(&self, opt: &Opt) {
 		let toml_content = opt.get_cargo_toml();
 		if let Some(output_file) = &opt.output {
 			let output_file = output_file.clone();
@@ -84,7 +72,7 @@ impl FullDB {
 	}
 
 	/// Makes a full crate for the mapping into a directory
-	fn make_full_crate(&self, opt : &Opt, toml_content : String, mut output_file : std::path::PathBuf) {
+	fn make_full_crate(&self, opt: &Opt, toml_content: String, mut output_file: std::path::PathBuf) {
 		//create crate directory
 		std::fs::create_dir_all(&output_file).unwrap();
 
@@ -104,16 +92,16 @@ impl FullDB {
 		File::create(lib_rs)
 			.unwrap()
 			.write_all(
-				maybe_format(&self.to_rust_tokens(opt), &opt).as_bytes()
-				// maybe_format(&self.to_rust_tokens(opt), &opt).as_bytes()
-			).expect("failed to write to file");
+				maybe_format(&self.to_rust_tokens(opt), &opt).as_bytes(), // maybe_format(&self.to_rust_tokens(opt), &opt).as_bytes()
+			)
+			.expect("failed to write to file");
 
 		//generate types.rs file and types folder
 		let types_rs = path_push_helper(&output_file, "types.rs");
-		File::create(types_rs).unwrap()
-			.write_all(
-				maybe_format(&self.types_content(opt), &opt).as_bytes()
-			).expect("failed to write to file");
+		File::create(types_rs)
+			.unwrap()
+			.write_all(maybe_format(&self.types_content(opt), &opt).as_bytes())
+			.expect("failed to write to file");
 		let types_folder = path_push_helper(&output_file, "types/");
 		std::fs::create_dir_all(&types_folder).unwrap();
 
@@ -124,18 +112,18 @@ impl FullDB {
 		if !opt.no_functions {
 			//generate sync_fns.rs file/folder
 			let sync_rs = path_push_helper(&output_file, "sync_fns.rs");
-			File::create(sync_rs).unwrap()
-			.write_all(
-				maybe_format(&self.sync_content(opt), &opt).as_bytes()
-			).expect("failed to write to file");
+			File::create(sync_rs)
+				.unwrap()
+				.write_all(maybe_format(&self.sync_content(opt), &opt).as_bytes())
+				.expect("failed to write to file");
 			std::fs::create_dir_all(&sync_folder).unwrap();
 
 			//generate async_fns.rs file/folder
 			let async_rs = path_push_helper(&output_file, "async_fns.rs");
-			File::create(async_rs).unwrap()
-			.write_all(
-				maybe_format(&self.async_content(opt), &opt).as_bytes()
-			).expect("failed to write to file");
+			File::create(async_rs)
+				.unwrap()
+				.write_all(maybe_format(&self.async_content(opt), &opt).as_bytes())
+				.expect("failed to write to file");
 			std::fs::create_dir_all(&async_folder).unwrap();
 		}
 
@@ -144,34 +132,32 @@ impl FullDB {
 		for schema in &self.schemas {
 			let file_name = format!("{}.rs", schema.name);
 
-			let schema_t  = path_push_helper(&types_folder, &file_name);
+			let schema_t = path_push_helper(&types_folder, &file_name);
 
-			File::create(schema_t).unwrap()
-				.write_all(
-					maybe_format(&schema.types_content(opt), &opt).as_bytes()
-				).expect("failed to write to file");
+			File::create(schema_t)
+				.unwrap()
+				.write_all(maybe_format(&schema.types_content(opt), &opt).as_bytes())
+				.expect("failed to write to file");
 
 			if !opt.no_functions {
-				let schema_s  = path_push_helper(&sync_folder, &file_name);
-				let schema_a  = path_push_helper(&async_folder, &file_name);
+				let schema_s = path_push_helper(&sync_folder, &file_name);
+				let schema_a = path_push_helper(&async_folder, &file_name);
 
-				File::create(schema_s).unwrap()
-				.write_all(
-					maybe_format(&schema.funcs_content(opt, true), &opt).as_bytes()
-				).expect("failed to write to file");
+				File::create(schema_s)
+					.unwrap()
+					.write_all(maybe_format(&schema.funcs_content(opt, true), &opt).as_bytes())
+					.expect("failed to write to file");
 
-				File::create(schema_a).unwrap()
-				.write_all(
-					maybe_format(&schema.funcs_content(opt, false), &opt).as_bytes()
-				).expect("failed to write to file");
+				File::create(schema_a)
+					.unwrap()
+					.write_all(maybe_format(&schema.funcs_content(opt, false), &opt).as_bytes())
+					.expect("failed to write to file");
 			}
-
-
 		}
 	}
 
 	/// Get the rust tokens for the top level of the mapping (it changes depending on whether the dir option is used)
-	fn to_rust_tokens(&self, opt : &Opt)-> TokenStream {
+	fn to_rust_tokens(&self, opt: &Opt) -> TokenStream {
 		if opt.dir {
 			self.to_dir_tokens(opt)
 		} else {
@@ -180,10 +166,10 @@ impl FullDB {
 	}
 
 	/// builds the contents of the types module
-	pub fn types_content(&self, opt : &Opt) -> TokenStream {
+	pub fn types_content(&self, opt: &Opt) -> TokenStream {
 		let schemas = self.schemas.iter().map(|v| v.get_types_module(opt));
 
-		quote!{
+		quote! {
 			#[cfg(feature = "with_serde")]
 			use serde::{
 				Serialize,
@@ -197,11 +183,12 @@ impl FullDB {
 			#(#schemas)*
 		}
 	}
+
 	/// builds the contents of the sync_fns module
-	pub fn sync_content(&self, opt : &Opt) -> TokenStream {
+	pub fn sync_content(&self, opt: &Opt) -> TokenStream {
 		let schemas = self.schemas.iter().map(|v| v.get_funcs_module(opt, true));
 
-		quote!{
+		quote! {
 			pub use postgres::{
 				Client,
 				Error as SqlError,
@@ -211,11 +198,12 @@ impl FullDB {
 			#(#schemas)*
 		}
 	}
+
 	/// builds the contents of the async_fns module
-	pub fn async_content(&self, opt : &Opt) -> TokenStream {
+	pub fn async_content(&self, opt: &Opt) -> TokenStream {
 		let schemas = self.schemas.iter().map(|v| v.get_funcs_module(opt, true));
 
-		quote!{
+		quote! {
 			pub use tokio_postgres::{
 				Client,
 				Error as SqlError,
@@ -233,16 +221,16 @@ impl FullDB {
 
 		let types_tokens = self.types_content(opt);
 		if opt.no_functions {
-			quote!{
+			quote! {
 				#opt_tokens
 
 				pub mod types{ use super::*; #types_tokens }
 			}
 		} else {
-			let sync_tokens  = self.sync_content(opt);
+			let sync_tokens = self.sync_content(opt);
 			let async_tokens = self.async_content(opt);
 
-			quote!{
+			quote! {
 				#opt_tokens
 
 				pub mod types{ use super::*; #types_tokens }
@@ -258,13 +246,13 @@ impl FullDB {
 	fn to_dir_tokens(&self, opt: &Opt) -> TokenStream {
 		let opt_tokens = crate_root_start(opt);
 		if opt.no_functions {
-			quote!{
+			quote! {
 				#opt_tokens
 
 				pub mod types;
 			}
 		} else {
-			quote!{
+			quote! {
 				#opt_tokens
 
 				pub mod types;
@@ -276,7 +264,7 @@ impl FullDB {
 		}
 	}
 }
-fn path_push_helper(path : &std::path::PathBuf, extention : &str) -> std::path::PathBuf {
+fn path_push_helper(path: &std::path::PathBuf, extention: &str) -> std::path::PathBuf {
 	let mut p = path.clone();
 	p.push(extention);
 	p
@@ -284,44 +272,46 @@ fn path_push_helper(path : &std::path::PathBuf, extention : &str) -> std::path::
 
 impl Schema {
 	///gets the content for this schema as it would appears in the `types` module
-	fn get_types_module(&self, opt : &Opt) -> TokenStream {
+	fn get_types_module(&self, opt: &Opt) -> TokenStream {
 		let name = format_heck(&self.name, opt, SnakeCase);
 		if opt.dir {
-			quote!{ pub mod #name; }
+			quote! { pub mod #name; }
 		} else {
 			let content = self.types_content(opt);
-			quote!{
+			quote! {
 				pub mod #name {
 					#content
 				}
 			}
 		}
 	}
-	fn types_content(&self, opt : &Opt) -> TokenStream {
+
+	fn types_content(&self, opt: &Opt) -> TokenStream {
 		let type_defs = self.types.iter().map(|v| sql_types::type_to_rust(&v, opt));
-		quote!{
+		quote! {
 			use super::*;
 			#(#type_defs)*
 		}
 	}
 
 	///gets the content for this schema as it would appears in the `sync_fns` and `async_fns` module
-	fn get_funcs_module(&self, opt : &Opt, is_sync : bool) -> TokenStream {
+	fn get_funcs_module(&self, opt: &Opt, is_sync: bool) -> TokenStream {
 		let name = format_heck(&self.name, opt, SnakeCase);
 		if opt.dir {
-			quote!{ pub mod #name; }
+			quote! { pub mod #name; }
 		} else {
 			let content = self.funcs_content(opt, is_sync);
-			quote!{
+			quote! {
 				pub mod #name {
 					#content
 				}
 			}
 		}
 	}
-	fn funcs_content(&self, opt : &Opt, is_sync : bool) -> TokenStream {
+
+	fn funcs_content(&self, opt: &Opt, is_sync: bool) -> TokenStream {
 		let proc_defs = self.procs.iter().map(|v| sql_procs::proc_to_rust(&v, opt, is_sync));
-		quote!{
+		quote! {
 			use super::*;
 			#(#proc_defs)*
 		}
@@ -329,46 +319,49 @@ impl Schema {
 }
 
 impl FullType {
-	fn to_tokens(&self, opt:&Opt) -> TokenStream {
+	fn to_tokens(&self, opt: &Opt) -> TokenStream {
 		let schema = format_heck(&self.schema, opt, SnakeCase);
-		let typ    = format_heck(&self.name, opt, CamelCase);
-		quote!{ crate::types::#schema::#typ }
+		let typ = format_heck(&self.name, opt, CamelCase);
+		quote! { crate::types::#schema::#typ }
 	}
 }
 
 
 impl NamesAndTypes {
-	fn as_function_params(&self, opt:&Opt) -> TokenStream {
-		self.0.iter().map(|tan| {
-			let name = format_heck(&tan.name, opt, SnakeCase);
-			let typ  = tan.typ.to_tokens(opt);
-			quote!{ #name : &#typ, }
-		}).collect()
+	fn as_function_params(&self, opt: &Opt) -> TokenStream {
+		self.0
+			.iter()
+			.map(|tan| {
+				let name = format_heck(&tan.name, opt, SnakeCase);
+				let typ = tan.typ.to_tokens(opt);
+				quote! { #name : &#typ, }
+			})
+			.collect()
 	}
 }
 
 /// Get the tokens that go at the top of the mapping, some uses, docs, and attributes
-fn crate_root_start(opt : &Opt) -> TokenStream {
+fn crate_root_start(opt: &Opt) -> TokenStream {
 	//allows if case isn't fixed
 	let fixed_case = if opt.formatted {
-		quote!{}
+		quote! {}
 	} else {
-		quote!{
+		quote! {
 			#![allow(non_snake_case)]
 			#![allow(non_camel_case_types)]
 		}
 	};
-	//if no functions reexport the types at the top level for convenience 
+	//if no functions reexport the types at the top level for convenience
 	let reexports = if opt.no_functions {
-		quote!{ pub use types::*; }
+		quote! { pub use types::*; }
 	} else {
-		quote!{}
+		quote! {}
 	};
 
-	let doc_str = format!("Generated by sql_db_mapper version={}", super::VERSION );
+	let doc_str = format!("Generated by sql_db_mapper version={}", super::VERSION);
 	let call_params = format!("Called with arguments `{}`", opt.get_call_string());
 
-	quote!{
+	quote! {
 		#![doc = #doc_str]
 		#![doc = ""]
 		#![doc = #call_params]

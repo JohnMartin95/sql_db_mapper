@@ -1,7 +1,5 @@
+use sql_db_mapper::Opt;
 use structopt::StructOpt;
-use sql_db_mapper::{
-	Opt,
-};
 
 fn main() {
 	let opt = Opt::from_args();

@@ -13,22 +13,13 @@
 //! [`TryFromRow`]: ./trait.TryFromRow.html
 //! [`Interval`]: ./struct.Interval.html
 
-pub use tokio_postgres::{
-	Error as SqlError,
-	row::Row,
-};
-
-use postgres_types::{
-	FromSql,
-	ToSql,
-	IsNull,
-	Type,
-	to_sql_checked,
-};
-
 use std::error::Error;
 
 pub use sql_db_mapper_derive::*;
+
+pub use tokio_postgres::{row::Row, Error as SqlError};
+use postgres_types::{to_sql_checked, FromSql, IsNull, ToSql, Type};
+
 
 /// Provides an implementation of [`TryFromRow`] for a given type that implements [`FromSql`]
 ///
@@ -53,7 +44,7 @@ macro_rules! try_from_row {
 /// [`tokio_postgres::Row`]: https://docs.rs/tokio-postgres/0.5.2/tokio_postgres/row/struct.Row.html
 /// [`FromSql`]: https://docs.rs/postgres-types/0.1.0/postgres_types/trait.FromSql.html
 pub trait TryFromRow: Sized {
-	fn from_row(row : &Row) -> Result<Self, SqlError>;
+	fn from_row(row: &Row) -> Result<Self, SqlError>;
 }
 // std types that have FromSql implementations
 impl TryFromRow for () {
@@ -110,13 +101,9 @@ try_from_row!(uuid::Uuid);
 try_from_row!(bit_vec::BitVec);
 
 
-
 // optional serialization
 #[cfg(feature = "with_serde")]
-use serde::{
-	Serialize,
-	Deserialize,
-};
+use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "time")]
 /// Wrapper type around a [`time::Duration`] that implements [`ToSql`], [`FromSql`], and [`TryFromRow`]
@@ -128,29 +115,33 @@ use serde::{
 #[cfg_attr(feature = "with_serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Interval {
-	pub dur : time::Duration
+	pub dur: time::Duration,
 }
 #[cfg(feature = "time")]
 impl FromSql<'_> for Interval {
 	fn from_sql(_ty: &Type, raw: &[u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
 		let x = i64::from_sql(&Type::INT4, &raw[0..8])?;
-		Ok(Interval{ dur : time::Duration::microseconds(x) })
+		Ok(Interval {
+			dur: time::Duration::microseconds(x),
+		})
 	}
+
 	fn accepts(ty: &Type) -> bool {
 		ty.oid() == 1186
 	}
 }
 #[cfg(feature = "time")]
 impl ToSql for Interval {
+	to_sql_checked!();
+
 	fn to_sql(&self, _ty: &Type, mut out: &mut bytes::BytesMut) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
 		let i = self.dur.whole_milliseconds();
 		(i as i64).to_sql(&Type::INT4, &mut out)
 	}
+
 	fn accepts(ty: &Type) -> bool {
 		ty.oid() == 1186
 	}
-
-	to_sql_checked!();
 }
 #[cfg(feature = "time")]
 try_from_row!(Interval);

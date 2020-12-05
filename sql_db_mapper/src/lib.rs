@@ -1,15 +1,15 @@
 #![forbid(unsafe_code)]
 //! Connects to a PostgreSQL database and creates a rust module representing all the schemas complete with mappings for stored functions/procedures
 
-mod sql_tree;
-pub mod connection;
 pub mod ast_convert;
+pub mod connection;
+mod sql_tree;
 
 pub const VERSION: &str = std::env!("CARGO_PKG_VERSION");
 
-use structopt::StructOpt;
-use std::path::PathBuf;
 use postgres::{Client, NoTls};
+use std::path::PathBuf;
+use structopt::StructOpt;
 
 /// The program options for the code generation
 #[derive(Debug, StructOpt)]
@@ -45,7 +45,7 @@ pub struct Opt {
 	/// none (skip mapping overloaded procs at all).
 	/// one_overload (avoid tuples by only mapping the oldest sql proc in the database).
 	#[structopt(long, default_value = "overloads")]
-	pub use_tuples : Tuples,
+	pub use_tuples: Tuples,
 
 	/// String to connect to database, see tokio_postgres::Config for details.
 	/// If not provided envirment variable SQL_MAP_CONN is checked instead
@@ -67,11 +67,11 @@ pub enum Tuples {
 impl std::str::FromStr for Tuples {
 	type Err = &'static str;
 
-	fn from_str(s: &str) -> Result<Tuples,  &'static str> {
+	fn from_str(s: &str) -> Result<Tuples, &'static str> {
 		match s {
-			"overloads"    => Ok(Tuples::ForOverloads),
-			"all"          => Ok(Tuples::ForAll),
-			"none"         => Ok(Tuples::NoOverloads),
+			"overloads" => Ok(Tuples::ForOverloads),
+			"all" => Ok(Tuples::ForAll),
+			"none" => Ok(Tuples::NoOverloads),
 			"one_overload" => Ok(Tuples::OldestOverload),
 			_ => Err("Invalid tuple handling option, use one of (overloads, all, none, one_overload)"),
 		}
@@ -91,9 +91,13 @@ impl Tuples {
 impl Opt {
 	/// Produce the Cargo.toml file contents (the dependecies of the generated code)
 	pub fn get_cargo_toml(&self) -> String {
-		let package_name = self.output.as_ref()
-			.map(|v| v.file_name()).flatten()
-			.map(|v|v.to_str()).flatten()
+		let package_name = self
+			.output
+			.as_ref()
+			.map(|v| v.file_name())
+			.flatten()
+			.map(|v| v.to_str())
+			.flatten()
 			.unwrap_or("my_db_mapping");
 
 		let mut dependencies = format!("[package]\nname = \"{}\"", package_name);
@@ -127,16 +131,15 @@ async = ["tokio-postgres", "async-trait"]
 	/// Build a call string that could be used to get the same options
 	pub fn get_call_string(&self) -> String {
 		// let sync  =  if self.sync  { " -s" } else { "" };
-		let ugly  =  if self.ugly  { " -u" } else { "" };
+		let ugly = if self.ugly { " -u" } else { "" };
 		// let serde =  if self.serde { " --serde" } else { "" };
-		let dir   =  if self.dir   { " --dir" } else { "" };
+		let dir = if self.dir { " --dir" } else { "" };
 		let formatted = if self.formatted { " -f" } else { "" };
-		let use_tuples =
-			if self.use_tuples == Tuples::ForOverloads {
-				String::new()
-			} else {
-				format!(" --use-tuples {}", self.use_tuples.to_str())
-			};
+		let use_tuples = if self.use_tuples == Tuples::ForOverloads {
+			String::new()
+		} else {
+			format!(" --use-tuples {}", self.use_tuples.to_str())
+		};
 		format!(
 			"sql_db_mapper{ugly}{dir}{formatted}{use_tuples}",
 			// sync = sync,
@@ -149,7 +152,8 @@ async = ["tokio-postgres", "async-trait"]
 	}
 
 	pub fn get_client(&self) -> connection::MyClient {
-		let client = Client::connect(&self.conn, NoTls).expect("Failed to connect to database, please check your connection string and try again");
+		let client = Client::connect(&self.conn, NoTls)
+			.expect("Failed to connect to database, please check your connection string and try again");
 
 		connection::MyClient::new(client)
 	}
@@ -162,16 +166,16 @@ async = ["tokio-postgres", "async-trait"]
 /// Can panic if acquiring/writing to stdin fails or the the text written to stdout or stderr by rustfmt is not valid utf8
 pub fn format_rust(value: &str) -> String {
 	use std::{
-		process::{
-			Command,
-			Stdio,
-		},
 		io::Write,
+		process::{Command, Stdio},
 	};
 	if let Ok(mut proc) = Command::new("rustfmt")
 		.arg("--emit=stdout")
 		.arg("--edition=2018")
-		.args(&["--config", "fn_single_line=true,hard_tabs=true,imports_layout=Vertical,reorder_imports=false,reorder_modules=false"])
+		.args(&[
+			"--config",
+			"fn_single_line=true,hard_tabs=true,imports_layout=Vertical,reorder_imports=false,reorder_modules=false",
+		])
 		.stdin(Stdio::piped())
 		.stdout(Stdio::piped())
 		.stderr(Stdio::piped())
@@ -189,10 +193,7 @@ pub fn format_rust(value: &str) -> String {
 				if output.status.success() {
 					// slice between after the prefix and before the suffix
 					// (currently 14 from the start and 2 before the end, respectively)
-					return std::str::from_utf8(&output.stdout)
-						.unwrap()
-						.to_owned()
-						.into();
+					return std::str::from_utf8(&output.stdout).unwrap().to_owned().into();
 				} else {
 					eprintln!("{:?}", output.status.code());
 					eprintln!("{}", std::str::from_utf8(&output.stdout).unwrap());
@@ -200,7 +201,7 @@ pub fn format_rust(value: &str) -> String {
 			},
 			Err(e) => {
 				eprintln!("Error or something: {}", e);
-			}
+			},
 		}
 	} else {
 		eprintln!("failed to spawn rustfmt")
