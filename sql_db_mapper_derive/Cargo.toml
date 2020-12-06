@@ -16,12 +16,6 @@ proc-macro = true
 syn = "1.0"
 quote = "1.0"
 proc-macro2 = "1.0"
-sql_db_mapper = { path = "../sql_db_mapper", version = "0.0.4", optional=true }
-structopt = { version="0.3", optional=true }
-
-
-[features]
-full = ["sql_db_mapper", "structopt"]
 
 
 [package.metadata.docs.rs]
