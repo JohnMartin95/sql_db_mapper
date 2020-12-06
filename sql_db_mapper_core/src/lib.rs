@@ -7,8 +7,8 @@
 //!
 //! Reexports [`tokio_postgres::Error`] as SqlError (the Result::Err of the return from [`TryFromRow::from_row`]) and [`tokio_postgres::Row`]
 //!
-//! [`tokio_postgres::Error`]: https://docs.rs/tokio-postgres/0.5.2/tokio_postgres/error/struct.Error.html
-//! [`tokio_postgres::Row`]: https://docs.rs/tokio-postgres/0.5.2/tokio_postgres/row/struct.Row.html
+//! [`tokio_postgres::Error`]: https://docs.rs/tokio-postgres/0.6/tokio_postgres/error/struct.Error.html
+//! [`tokio_postgres::Row`]: https://docs.rs/tokio-postgres/0.6/tokio_postgres/row/struct.Row.html
 //! [`TryFromRow::from_row`]: ./trait.TryFromRow.html#tymethod.from_row
 //! [`TryFromRow`]: ./trait.TryFromRow.html
 //! [`Interval`]: ./struct.Interval.html
@@ -20,13 +20,12 @@ pub use sql_db_mapper_derive::*;
 pub use tokio_postgres::{row::Row, Error as SqlError};
 use postgres_types::{to_sql_checked, FromSql, IsNull, ToSql, Type};
 
-
 /// Provides an implementation of [`TryFromRow`] for a given type that implements [`FromSql`]
 ///
 /// Does not check if the row contains more than one value (i.e. a row containing 3 columns with the first being a bool will be directly convertable to a bool)
 ///
 /// [`TryFromRow`]: ./trait.TryFromRow.html
-/// [`FromSql`]: https://docs.rs/postgres-types/0.1.0/postgres_types/trait.FromSql.html
+/// [`FromSql`]: https://docs.rs/postgres-types/0.1/postgres_types/trait.FromSql.html
 macro_rules! try_from_row {
 	($impl_type:ty) => {
 		impl TryFromRow for $impl_type {
@@ -41,8 +40,8 @@ macro_rules! try_from_row {
 /// Converts from a [`tokio_postgres::Row`]. Implementations are provided for rows that contain only a single value of several types that implement [`FromSql`] (currently no check is done that the row only contained one value)
 ///
 /// [`TryFromRow`]: ./trait.TryFromRow.html
-/// [`tokio_postgres::Row`]: https://docs.rs/tokio-postgres/0.5.2/tokio_postgres/row/struct.Row.html
-/// [`FromSql`]: https://docs.rs/postgres-types/0.1.0/postgres_types/trait.FromSql.html
+/// [`tokio_postgres::Row`]: https://docs.rs/tokio-postgres/0.6/tokio_postgres/row/struct.Row.html
+/// [`FromSql`]: https://docs.rs/postgres-types/0.1/postgres_types/trait.FromSql.html
 pub trait TryFromRow: Sized {
 	fn from_row(row: &Row) -> Result<Self, SqlError>;
 }
@@ -108,9 +107,9 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "time")]
 /// Wrapper type around a [`time::Duration`] that implements [`ToSql`], [`FromSql`], and [`TryFromRow`]
 ///
-/// [`time::Duration`]: https://docs.rs/time/0.2.6/time/struct.Duration.html
-/// [`ToSql`]: https://docs.rs/postgres-types/0.1.0/postgres_types/trait.ToSql.html
-/// [`FromSql`]: https://docs.rs/postgres-types/0.1.0/postgres_types/trait.FromSql.html
+/// [`time::Duration`]: https://docs.rs/time/0.2/time/struct.Duration.html
+/// [`ToSql`]: https://docs.rs/postgres-types/0.1/postgres_types/trait.ToSql.html
+/// [`FromSql`]: https://docs.rs/postgres-types/0.1/postgres_types/trait.FromSql.html
 /// [`TryFromRow`]: ./trait.TryFromRow.html
 #[cfg_attr(feature = "with_serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
