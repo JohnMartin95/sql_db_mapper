@@ -1011,6 +1011,7 @@ dependencies = [
  "postgres 0.18.1",
  "proc-macro2",
  "quote",
+ "sql_db_mapper_core",
  "structopt",
 ]
 
@@ -1039,8 +1040,6 @@ version = "0.0.4"
 dependencies = [
  "proc-macro2",
  "quote",
- "sql_db_mapper",
- "structopt",
  "syn",
 ]
 

@@ -18,6 +18,8 @@ proc-macro2 = { version = "1.0" }
 structopt = "0.3"
 heck = "0.3.1"
 
+sql_db_mapper_core = { path = "../sql_db_mapper_core", version = "0.0.4" }
+
 [lib]
 name = "sql_db_mapper"
 path = "src/lib.rs"

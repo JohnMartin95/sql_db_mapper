@@ -12,7 +12,7 @@ impl FullDB {
 	}
 }
 
-/// Database schema. COntains all Types and procedures defined inside
+/// Database schema. Contains all Types and procedures defined inside
 ///
 /// All sql procures with overloading (the same name) are stored in a Vec the length of the `procs` Vec is the number of unique procedure names in the schema
 #[derive(Debug, Clone)]

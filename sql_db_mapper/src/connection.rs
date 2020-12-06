@@ -1,100 +1,10 @@
-use super::sql_tree::*;
-use postgres::{Client, Row, Statement};
-use std::collections::{hash_map::Entry, HashMap};
+use super::{
+	sql_tree::*,
+	pg_select_types::*,
+};
+use postgres::{Client, Statement};
+use sql_db_mapper_core::*;
 
-const GET_SCHEMAS: &str = "SELECT ns.oid, nspname, nspowner, rolname
-FROM pg_namespace ns
-LEFT JOIN pg_roles r
-ON nspowner = r.oid
-ORDER BY ns.oid ASC";
-
-
-const GET_TYPES: &str = "SELECT oid,
-	typname,
-	typlen,
-	typbyval,
-	typtype,
-	typrelid,
-	typalign
-FROM pg_type
-WHERE typnamespace = $1 AND
-	(typarray != 0 OR
-	typtype = 'd' OR
-	oid = 2278)
-ORDER BY oid ASC";
-
-const GET_ENUM: &str = "SELECT oid, enumtypid, enumsortorder, enumlabel
-FROM pg_enum
-WHERE enumtypid = $1
-ORDER BY enumsortorder ASC";
-
-
-const GET_COLUMNS: &str = "SELECT attnum,
-	attname,
-	atttypid,
-	typname,
-	nspname,
-	attlen,
-	atttypmod,
-	attnotnull
-FROM pg_attribute a
-LEFT JOIN pg_type b ON atttypid = b.oid
-LEFT JOIN pg_namespace c ON typnamespace = c.oid
-WHERE attnum > 0 AND NOT attisdropped
-	AND attrelid = $1
-ORDER BY attnum ASC";
-
-const GET_DOMAIN_BASE: &str = "SELECT t2.oid,
-	ns.nspname,
-	t2.typname
-FROM pg_type AS t
-JOIN pg_type AS t2
-	ON t2.oid = t.typbasetype
-JOIN pg_namespace AS ns
-	ON t2.typnamespace = ns.oid
-WHERE t.oid = $1";
-
-const GET_PROC_NAMES: &str = "SELECT MIN(p.oid) as p_oid,
-	p.proname
-FROM pg_proc AS p
-JOIN pg_namespace AS ns
-	ON ns.oid = p.pronamespace
-WHERE pronamespace = $1 AND
-	pronamespace != 11 AND
-	ns.nspname != 'information_schema' AND
-	ns.nspname != 'public'
-GROUP BY p.proname
-ORDER BY p_oid ASC";
-
-const GET_PROCS: &str = "SELECT ns.oid as ns_oid,
-	ns.nspname,
-	p.oid as p_oid,
-	p.proname,
-	p.proretset,
-	p.pronargs,
-	p.prorettype,
-	t.typname,
-	p.proargtypes,
-	p.proallargtypes,
-	p.proargmodes,
-	p.proargnames
-FROM pg_proc AS p
-JOIN pg_namespace AS ns
-	ON ns.oid = p.pronamespace
-JOIN pg_type AS t
-	ON p.prorettype = t.oid
-WHERE pronamespace = $1 AND
-	proname = $2 AND
-	pronamespace != 11 AND
-	ns.nspname != 'information_schema' AND
-	ns.nspname != 'public'
-ORDER BY p_oid ASC";
-
-const GET_TYPE_NAME: &str = "SELECT ns.nspname, t.typname
-FROM pg_type t
-JOIN pg_namespace AS ns
-	ON ns.oid = t.typnamespace
-WHERE t.oid = $1";
 
 const RUST_KEYWORDS: [&str; 58] = [
 	"as",
@@ -159,21 +69,29 @@ const RUST_KEYWORDS: [&str; 58] = [
 
 pub struct MyClient {
 	client: Client,
-	statements: HashMap<&'static str, Statement>,
+	schemas_stmt : Statement,
+	types_stmt : Statement,
+	enum_stmt : Statement,
+	columns_stmt : Statement,
+	domain_base_stmt : Statement,
+	proc_names_stmt : Statement,
+	procs_stmt : Statement,
+	type_name_stmt : Statement,
+
 }
 //
 impl MyClient {
-	pub fn new(client: Client) -> MyClient {
+	pub fn new(mut client: Client) -> MyClient {
 		MyClient {
+			schemas_stmt : client.prepare(GET_SCHEMAS).unwrap(),
+			types_stmt : client.prepare(GET_TYPES).unwrap(),
+			enum_stmt : client.prepare(GET_ENUM).unwrap(),
+			columns_stmt : client.prepare(GET_COLUMNS).unwrap(),
+			domain_base_stmt : client.prepare(GET_DOMAIN_BASE).unwrap(),
+			proc_names_stmt : client.prepare(GET_PROC_NAMES).unwrap(),
+			procs_stmt : client.prepare(GET_PROCS).unwrap(),
+			type_name_stmt : client.prepare(GET_TYPE_NAME).unwrap(),
 			client,
-			statements: HashMap::new(),
-		}
-	}
-
-	pub fn prepare_cached<'a>(&'a mut self, stmt_str: &'static str) -> Statement {
-		match self.statements.entry(stmt_str) {
-			Entry::Occupied(v) => v.into_mut().clone(),
-			Entry::Vacant(v) => v.insert(self.client.prepare(stmt_str).unwrap()).clone(),
 		}
 	}
 
@@ -181,11 +99,20 @@ impl MyClient {
 		let mut full_db = FullDB { schemas: Vec::new() };
 
 		// gets all the schemas in the current db
-		let schemas = self.get_schemas();
+		let schemas = self.get_schemas().unwrap();
+		let schemas : Vec<_> = schemas.into_iter().map(|v|{
+			Schema {
+				id: v.oid,
+				name: v.name,
+				owner_name: v.owner,
+				types: Vec::new(),
+				procs: Vec::new(),
+			}
+		}).collect();
 
 		for mut schema in schemas {
 			//get all types and tables
-			let types = self.get_types(schema.id);
+			let types = self.get_psql_types(schema.id);
 			schema.append_types(types);
 			//get all stored procedures/functions (if required)
 			if !no_functions {
@@ -200,50 +127,24 @@ impl MyClient {
 		full_db
 	}
 
-	pub fn get_schemas(&mut self) -> Vec<Schema> {
-		self.client
-			.query(GET_SCHEMAS, &[])
-			.unwrap()
-			.into_iter()
-			.map(|row| Schema {
-				id: row.get(0),
-				name: row.get(1),
-				owner_name: row.get(3),
-				types: Vec::new(),
-				procs: Vec::new(),
-			})
-			.collect()
-	}
-
 	pub fn get_procedures(&mut self, schema_id: SchemaId) -> (Vec<Vec<SqlProc>>, Vec<PsqlType>) {
-		let stmt = self.prepare_cached(GET_PROC_NAMES);
+		let names = self.get_proc_names(schema_id).unwrap();
 
-		let (procs, types): (Vec<_>, Vec<_>) = self
-			.client
-			.query(&stmt, &[&schema_id])
-			.unwrap()
+		let (procs, types): (Vec<_>, Vec<_>) = names
 			.into_iter()
-			.map(|v| -> String { v.get(1) })
-			.map(|proc_name| self.get_procs_by_name(proc_name, schema_id))
+			.map(|v| self.get_procs_by_name(v.name, schema_id))
 			.unzip();
+
 		(procs, types.concat())
-		// .collect()
 	}
 
 	fn get_procs_by_name(&mut self, proc_name: String, schema_id: SchemaId) -> (Vec<SqlProc>, Vec<PsqlType>) {
-		let stmt = self.prepare_cached(GET_PROCS);
+		let full_procs = self.get_procs(schema_id, proc_name).unwrap();
 
 		let mut procs = Vec::new();
 		let mut types = Vec::new();
 
-		let iter = self
-			.client
-			.query(&stmt, &[&schema_id, &proc_name])
-			.unwrap()
-			.into_iter()
-			.map(|v| self.get_proc_by_id(v));
-
-		for (p, t) in iter {
+		for (p, t) in full_procs.into_iter().map(|v| self.get_proc_by_id(v)) {
 			procs.push(p);
 			types.extend(t);
 		}
@@ -251,28 +152,21 @@ impl MyClient {
 		(procs, types)
 	}
 
-	fn get_proc_by_id(&mut self, v: Row) -> (SqlProc, Option<PsqlType>) {
-		let ns_oid: u32 = v.get(0);
-		let ns_name: String = v.get(1);
-		let name: String = v.get(3);
-
-		let all_arg_types: Option<Vec<u32>> = v.get(9);
-		let arg_modes: Option<Vec<i8>> = v.get(10);
-
-		let (all_arg_types, arg_modes): (Vec<u32>, Vec<i8>) = if let Some(all_arg_types) = all_arg_types {
-			if let Some(arg_modes) = arg_modes {
+	fn get_proc_by_id(&mut self, v: GetProcs) -> (SqlProc, Option<PsqlType>) {
+		let (all_arg_types, arg_modes): (Vec<u32>, Vec<i8>) = if let Some(all_arg_types) = v.all_arg_types {
+			if let Some(arg_modes) = v.arg_modes {
 				(all_arg_types, arg_modes)
 			} else {
-				let inputs: Vec<u32> = v.get(8);
+				let inputs = v.arg_types;
 				let len = inputs.len();
 				(inputs, vec![b'i' as i8; len])
 			}
 		} else {
-			let inputs: Vec<u32> = v.get(8);
+			let inputs = v.arg_types;
 			let len = inputs.len();
 			(inputs, vec![b'i' as i8; len])
 		};
-		let arg_names: Option<Vec<String>> = v.get(11);
+		let arg_names = v.arg_names;
 		let arg_names = match arg_names {
 			Some(a_n) => a_n,
 			None => Vec::new(),
@@ -280,30 +174,17 @@ impl MyClient {
 		let (inputs, outputs) = self.get_proc_output_type(&all_arg_types, &arg_modes, arg_names);
 
 		let new_outputs = if outputs.0.is_empty() {
-			let ret_type_id: u32 = v.get(6);
-			let stmt = self.prepare_cached(GET_TYPE_NAME);
-			let mut type_name: Vec<_> = self
-				.client
-				.query(&stmt, &[&ret_type_id])
-				.unwrap()
-				.into_iter()
-				.map(|v2| {
-					let ns: String = v2.get(0);
-					let typ: String = v2.get(1);
-					(ns, typ)
-				})
-				.collect();
-			assert_eq!(type_name.len(), 1);
-			let (nspname, typename) = type_name.remove(0);
+			let ret_type_id = v.ret_type_id;
+			let type_name = self.get_type_name(ret_type_id).unwrap().unwrap();
 
 			FullType {
-				schema: nspname,
-				name: typename,
+				schema: type_name.ns_name,
+				name: type_name.name,
 			}
 		} else {
 			FullType {
-				schema: ns_name.clone(),
-				name: format!("{}Return", name),
+				schema: v.ns_name.clone(),
+				name: format!("{}Return", v.name),
 			}
 		};
 
@@ -311,20 +192,20 @@ impl MyClient {
 			None
 		} else {
 			Some(PsqlType {
-				name: format!("{}Return", name),
-				ns: ns_oid,
+				name: format!("{}Return", v.name),
+				ns: v.ns_oid,
 				typ: PsqlTypType::SimpleComposite(outputs),
 			})
 		};
 
 		(
 			SqlProc {
-				ns: ns_oid,
-				ns_name,
-				oid: v.get(2),
-				name,
-				returns_set: v.get(4),
-				num_args: v.get(5),
+				ns: v.ns_oid,
+				ns_name: v.ns_name,
+				oid: v.p_oid,
+				name: v.name,
+				returns_set: v.returns_set,
+				num_args: v.num_args,
 				inputs,
 				outputs: new_outputs,
 			},
@@ -367,33 +248,20 @@ impl MyClient {
 			let typ_mode = arg_modes[i];
 			let arg_name = arg_names[i].clone();
 
-			let stmt = self.prepare_cached(GET_TYPE_NAME);
-			let mut type_name: Vec<_> = self
-				.client
-				.query(&stmt, &[&typ_oid])
-				.unwrap()
-				.into_iter()
-				.map(|v2| {
-					let ns: String = v2.get(0);
-					let typ: String = v2.get(1);
-					(ns, typ)
-				})
-				.collect();
-			assert_eq!(type_name.len(), 1);
-			let (nspname, typename) = type_name.remove(0);
+			let type_name = self.get_type_name(typ_oid).unwrap().unwrap();
 
 			match typ_mode as u8 {
 				b'i' => inputs.push(TypeAndName {
 					typ: FullType {
-						schema: nspname,
-						name: typename,
+						schema: type_name.ns_name,
+						name: type_name.name,
 					},
 					name: arg_name,
 				}),
 				b't' => outputs.push(TypeAndName {
 					typ: FullType {
-						schema: nspname,
-						name: typename,
+						schema: type_name.ns_name,
+						name: type_name.name,
 					},
 					name: arg_name,
 				}),
@@ -403,93 +271,140 @@ impl MyClient {
 		(NamesAndTypes(inputs), NamesAndTypes(outputs))
 	}
 
-	pub fn get_types(&mut self, schema_id: SchemaId) -> Vec<PsqlType> {
+	pub fn get_psql_types(&mut self, schema_id: SchemaId) -> Vec<PsqlType> {
 		let ns_oid = schema_id;
-		let stmt = self.prepare_cached(GET_TYPES);
+		// let stmt = self.prepare_cached(GET_TYPES);
+		let types = self.get_types(ns_oid).unwrap();
 
-		self.client
-			.query(&stmt, &[&ns_oid])
-			.unwrap()
-			.into_iter()
-			.map(|v| {
-				PsqlType {
-					name: v.get(1),
-					ns: schema_id,
-					// len : v.get(2),
-					// by_val : v.get(3),
-					typ: {
-						let tmp: i8 = v.get(4);
-						use PsqlTypType::*;
-						match tmp as u8 as char {
-							'e' => Enum(PsqlEnumType {
-								oid: v.get(0),
-								labels: self.get_enum_labels(v.get(0)),
-							}),
-							'c' => Composite(PsqlCompositeType {
-								oid: v.get(0),
-								cols: self.get_columns(v.get(5)),
-							}),
-							'b' => Base(PsqlBaseType {
-								oid: v.get(0),
-								name: v.get(1),
-							}),
-							'd' => Domain(self.get_domain_base(v.get(0))),
-							_ => {
-								// println!("typ:{}, name:{}, oid:{}", tmp as u8 as char, v.get::<_, String>(1), v.get::<_, u32>(0));
-								Other(v.get(0))
-							},
-						}
-					},
-					// relid : v.get(5),
-					// align : v.get(6)
-				}
-			})
-			.collect()
+		types.into_iter().map(|v| {
+			PsqlType {
+				name: v.name.clone(),
+				ns: schema_id,
+				// len : v.len,
+				// by_val : v.by_val,
+				typ: {
+					use PsqlTypType::*;
+					match v.typ as u8 {
+						b'e' => Enum(PsqlEnumType {
+							oid: v.oid,
+							labels: self.get_enum_labels(v.oid),
+						}),
+						b'c' => Composite(PsqlCompositeType {
+							oid: v.oid,
+							cols: self.get_psql_columns(v.rel_id),
+						}),
+						b'b' => Base(PsqlBaseType {
+							oid: v.oid,
+							name: v.name,
+						}),
+						b'd' => Domain(self.get_psql_domain(v.oid)),
+						_ => {
+							// println!("typ:{}, name:{}, oid:{}", tmp as u8 as char, v.get::<_, String>(1), v.get::<_, u32>(0));
+							Other(v.oid)
+						},
+					}
+				},
+				// relid : v.rel_id,
+				// align : v.align,
+			}
+		}).collect()
 	}
 
-	fn get_domain_base(&mut self, oid: u32) -> PsqlDomain {
-		let stmt = self.prepare_cached(GET_DOMAIN_BASE);
-
-		self.client
-			.query(&stmt, &[&oid])
+	fn get_psql_domain(&mut self, oid: u32) -> PsqlDomain {
+		let domain_base = self
+			.get_domain_base(oid)
 			.unwrap()
-			.into_iter()
-			.map(|v| PsqlDomain {
-				oid,
-				base_oid: v.get(0),
-				base_ns_name: v.get(1),
-				base_name: v.get(2),
-			})
-			.next()
-			.unwrap()
+			.unwrap();
+		
+		PsqlDomain {
+			oid,
+			base_oid: domain_base.oid,
+			base_ns_name: domain_base.ns_name,
+			base_name: domain_base.typ_name,
+		}
 	}
 
-	pub fn get_columns(&mut self, rel_id: u32) -> Vec<Column> {
-		let stmt = self.prepare_cached(GET_COLUMNS);
-
-		self.client
-			.query(&stmt, &[&rel_id])
+	pub fn get_psql_columns(&mut self, rel_id: u32) -> Vec<Column> {
+		self
+			.get_columns(rel_id)
 			.unwrap()
 			.into_iter()
 			.map(|v| Column {
-				pos: v.get(0),
-				name: v.get(1),
-				type_id: v.get(2),
-				type_name: v.get(3),
-				type_ns_name: v.get(4),
-				not_null: v.get(7),
+				pos: v.attnum,
+				name: v.name,
+				type_id: v.typ_id,
+				type_name: v.typ_name,
+				type_ns_name: v.nspname,
+				not_null: v.not_null,
 			})
 			.collect()
 	}
 
 	fn get_enum_labels(&mut self, type_id: u32) -> Vec<String> {
-		let stmt = self.prepare_cached(GET_ENUM);
-
-		self.client
-			.query(&stmt, &[&type_id])
+		self
+			.get_enum(type_id)
 			.unwrap()
 			.into_iter()
-			.map(|v| v.get(3))
+			.map(|v| v.label)
 			.collect()
+	}
+}
+/// Wrappers on SQL select statements
+impl MyClient {
+	fn get_schemas(&mut self) -> Result<Vec<GetSchemas>, SqlError> {
+		self.client
+			.query(&self.schemas_stmt, &[])?
+			.iter()
+			.map(TryFromRow::from_row)
+			.collect()
+	}
+	fn get_types(&mut self, ns_id: u32) -> Result<Vec<GetTypes>, SqlError> {
+		self.client
+			.query(&self.types_stmt, &[&ns_id])?
+			.iter()
+			.map(TryFromRow::from_row)
+			.collect()
+	}
+	fn get_enum(&mut self, type_id: u32) -> Result<Vec<GetEnum>, SqlError> {
+		self.client
+			.query(&self.enum_stmt, &[&type_id])?
+			.iter()
+			.map(TryFromRow::from_row)
+			.collect()
+	}
+	fn get_columns(&mut self, class_id: u32) -> Result<Vec<GetColumns>, SqlError> {
+		self.client
+			.query(&self.columns_stmt, &[&class_id])?
+			.iter()
+			.map(TryFromRow::from_row)
+			.collect()
+	}
+	fn get_domain_base(&mut self, type_id: u32) -> Result<Option<GetDomainBase>, SqlError> {
+		self.client
+			.query_opt(&self.domain_base_stmt, &[&type_id])?
+			.as_ref()
+			.map(TryFromRow::from_row)
+			.transpose()
+	}
+	fn get_proc_names(&mut self, ns_id: u32) -> Result<Vec<GetProcNames>, SqlError> {
+		self.client
+			.query(&self.proc_names_stmt, &[&ns_id])?
+			.iter()
+			.map(TryFromRow::from_row)
+			.collect()
+	}
+	fn get_procs(&mut self, ns_id: u32, proc_name : String) -> Result<Vec<GetProcs>, SqlError> {
+		self.client
+			.query(&self.procs_stmt, &[&ns_id, &proc_name])?
+			.iter()
+			.map(TryFromRow::from_row)
+			.collect()
+	}
+	fn get_type_name(&mut self, id: u32) -> Result<Option<GetTypeName>, SqlError> {
+		self.client
+			.query_opt(&self.type_name_stmt, &[&id])?
+			.as_ref()
+			.map(GetTypeName::from_row)
+			.transpose()
 	}
 }

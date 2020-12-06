@@ -4,6 +4,7 @@
 pub mod ast_convert;
 pub mod connection;
 mod sql_tree;
+mod pg_select_types;
 
 pub const VERSION: &str = std::env!("CARGO_PKG_VERSION");
 
@@ -59,9 +60,13 @@ pub struct Opt {
 
 #[derive(Debug, StructOpt, Clone, Copy, PartialEq, Eq)]
 pub enum Tuples {
+	/// use tuples to represent function overloading
 	ForOverloads,
+	/// Have all functions take a tuple for consitency
 	ForAll,
+	/// skip mapping overloaded procs at all
 	NoOverloads,
+	/// avoid tuples by only mapping the oldest sql proc in the database
 	OldestOverload,
 }
 impl std::str::FromStr for Tuples {
