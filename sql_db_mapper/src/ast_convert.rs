@@ -18,7 +18,7 @@ enum Case {
 use Case::*;
 /// Optionally do capitalization
 fn format_heck(name: &str, opt: &Opt, case: Case) -> proc_macro2::Ident {
-	if opt.formatted {
+	if opt.rust_case {
 		match case {
 			SnakeCase => format_ident_h(&name.to_snake_case()),
 			CamelCase => format_ident_h(&name.to_camel_case()),
@@ -46,7 +46,11 @@ fn maybe_format(input: &TokenStream, opt: &Opt) -> String {
 	if opt.ugly {
 		output
 	} else {
-		format_rust(&output)
+		format_rust(
+			&output,
+			opt.rustfmt_config.as_deref(),
+			opt.rustfmt_config_path.as_deref(),
+		)
 	}
 }
 
@@ -343,7 +347,7 @@ impl NamesAndTypes {
 /// Get the tokens that go at the top of the mapping, some uses, docs, and attributes
 fn crate_root_start(opt: &Opt) -> TokenStream {
 	//allows if case isn't fixed
-	let fixed_case = if opt.formatted {
+	let fixed_case = if opt.rust_case {
 		quote! {}
 	} else {
 		quote! {

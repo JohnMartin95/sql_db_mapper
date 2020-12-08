@@ -17,8 +17,8 @@ use std::error::Error;
 
 pub use sql_db_mapper_derive::*;
 
-pub use tokio_postgres::{row::Row, Error as SqlError};
 use postgres_types::{to_sql_checked, FromSql, IsNull, ToSql, Type};
+pub use tokio_postgres::{row::Row, Error as SqlError};
 
 /// Provides an implementation of [`TryFromRow`] for a given type that implements [`FromSql`]
 ///

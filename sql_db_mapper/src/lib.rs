@@ -3,8 +3,8 @@
 
 pub mod ast_convert;
 pub mod connection;
-mod sql_tree;
 mod pg_select_types;
+mod sql_tree;
 
 pub const VERSION: &str = std::env!("CARGO_PKG_VERSION");
 
@@ -33,8 +33,16 @@ pub struct Opt {
 	pub dir: bool,
 
 	/// Convert names from the database to rust standard (i.e. table names in CamelCase, fields and functions in snake_case)
-	#[structopt(short, long)]
-	pub formatted: bool,
+	#[structopt(long)]
+	pub rust_case: bool,
+
+	/// string passed to rustfmt --config
+	#[structopt(long)]
+	pub rustfmt_config: Option<String>,
+
+	/// string passed to rustfmt --config-path
+	#[structopt(long)]
+	pub rustfmt_config_path: Option<String>,
 
 	/// Only make mappings for tables and views
 	#[structopt(long)]
@@ -139,19 +147,19 @@ async = ["tokio-postgres", "async-trait"]
 		let ugly = if self.ugly { " -u" } else { "" };
 		// let serde =  if self.serde { " --serde" } else { "" };
 		let dir = if self.dir { " --dir" } else { "" };
-		let formatted = if self.formatted { " -f" } else { "" };
+		let rust_case = if self.rust_case { " --rust_case" } else { "" };
 		let use_tuples = if self.use_tuples == Tuples::ForOverloads {
 			String::new()
 		} else {
 			format!(" --use-tuples {}", self.use_tuples.to_str())
 		};
 		format!(
-			"sql_db_mapper{ugly}{dir}{formatted}{use_tuples}",
+			"sql_db_mapper{ugly}{dir}{rust_case}{use_tuples}",
 			// sync = sync,
 			ugly = ugly,
 			// serde = serde,
 			dir = dir,
-			formatted = formatted,
+			rust_case = rust_case,
 			use_tuples = use_tuples,
 		)
 	}
@@ -169,18 +177,24 @@ async = ["tokio-postgres", "async-trait"]
 /// On any rustfmt error stderr is written to and a copy of the input is returned
 ///
 /// Can panic if acquiring/writing to stdin fails or the the text written to stdout or stderr by rustfmt is not valid utf8
-pub fn format_rust(value: &str) -> String {
+pub fn format_rust(value: &str, rustfmt_config: Option<&str>, rustfmt_config_path: Option<&str>) -> String {
 	use std::{
 		io::Write,
 		process::{Command, Stdio},
 	};
+	let mut args = Vec::new();
+	if let Some(s) = rustfmt_config {
+		args.push("--config");
+		args.push(s);
+	}
+	if let Some(s) = rustfmt_config_path {
+		args.push("--config-path");
+		args.push(s);
+	}
 	if let Ok(mut proc) = Command::new("rustfmt")
 		.arg("--emit=stdout")
 		.arg("--edition=2018")
-		.args(&[
-			"--config",
-			"fn_single_line=true,hard_tabs=true,imports_layout=Vertical,reorder_imports=false,reorder_modules=false",
-		])
+		.args(&args)
 		.stdin(Stdio::piped())
 		.stdout(Stdio::piped())
 		.stderr(Stdio::piped())
@@ -196,8 +210,6 @@ pub fn format_rust(value: &str) -> String {
 					eprintln!("{}", std::str::from_utf8(&output.stderr).unwrap());
 				}
 				if output.status.success() {
-					// slice between after the prefix and before the suffix
-					// (currently 14 from the start and 2 before the end, respectively)
 					return std::str::from_utf8(&output.stdout).unwrap().to_owned().into();
 				} else {
 					eprintln!("{:?}", output.status.code());
@@ -205,7 +217,7 @@ pub fn format_rust(value: &str) -> String {
 				}
 			},
 			Err(e) => {
-				eprintln!("Error or something: {}", e);
+				eprintln!("Error running rustfmt: {}", e);
 			},
 		}
 	} else {
