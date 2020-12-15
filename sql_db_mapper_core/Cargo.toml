@@ -34,7 +34,7 @@ serde = { version = "1.0", optional = true }
 
 
 [features]
-default = ["with-chrono-0_4", "with-time-0_2", "with-rust_decimal-1", "with-uuid-0_8"]
+default = ["with-chrono-0_4", "with-time-0_2", "with-rust_decimal-1", "with-uuid-0_8", "with-serde_json-1"]
 # include (De)Serialize impls
 with_serde = ["serde", "serde/derive", "chrono/serde", "time/serde"]
 with-rust_decimal-1  = ["rust_decimal"]
