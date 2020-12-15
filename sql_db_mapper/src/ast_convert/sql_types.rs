@@ -109,16 +109,22 @@ pub fn base_to_ast(b: &PsqlBaseType, opt: &Opt) -> TokenStream {
 	let oid_type = match b.oid {
 		16 => quote! { std::primitive::bool },
 		17 => quote! { Vec<u8> },
+		18 => quote! { i8 },
 		20 => quote! { i64 },
+		21 => quote! { i16 },
 		23 => quote! { i32 },
 		26 => quote! { u32 },
 		19 | 25 | 1042 | 1043 => quote! { String },
+		700 => quote!{ f32 },
+		701 => quote!{ f64 },
 		1082 => quote! { chrono::NaiveDate },
+		1083 => quote! { chrono::NaiveTime },
 		1114 => quote! { chrono::NaiveDateTime },
 		1184 => quote! { chrono::DateTime<chrono::Utc> },
 		1186 => quote! { sql_db_mapper_core::Interval },
 		1700 => quote! { rust_decimal::Decimal },
 		2278 => quote! { () },
+		2950 => quote! { uuid::Uuid },
 		oid => {
 			if opt.debug {
 				println!("No Rust type for postgres type with oid : {}", oid)

@@ -183,6 +183,7 @@ impl FullDB {
 				FromSql,
 				ToSql,
 			};
+			use super::orm::*;
 
 			#(#schemas)*
 		}

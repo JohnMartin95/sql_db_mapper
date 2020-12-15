@@ -17,8 +17,25 @@ use std::error::Error;
 
 pub use sql_db_mapper_derive::*;
 
-use postgres_types::{to_sql_checked, FromSql, IsNull, ToSql, Type};
+use postgres_types::{to_sql_checked, IsNull, Type};
+pub use postgres_types::{ FromSql, ToSql };
 pub use tokio_postgres::{row::Row, Error as SqlError};
+
+//reexport used crates so user doesn't need them in their Cargo.toml
+#[cfg(feature = "chrono")]
+pub use chrono;
+#[cfg(feature = "rust_decimal")]
+pub use rust_decimal;
+#[cfg(feature = "eui48")]
+pub use eui48;
+#[cfg(feature = "geo_types")]
+pub use geo_types;
+#[cfg(feature = "serde_json")]
+pub use serde_json;
+#[cfg(feature = "uuid")]
+pub use uuid;
+#[cfg(feature = "bit_vec")]
+pub use bit_vec;
 
 /// Provides an implementation of [`TryFromRow`] for a given type that implements [`FromSql`]
 ///

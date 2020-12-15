@@ -1005,7 +1005,7 @@ dependencies = [
 
 [[package]]
 name = "sql_db_mapper"
-version = "0.0.4"
+version = "0.1.0"
 dependencies = [
  "heck",
  "postgres 0.18.1",
@@ -1017,7 +1017,7 @@ dependencies = [
 
 [[package]]
 name = "sql_db_mapper_core"
-version = "0.0.4"
+version = "0.1.0"
 dependencies = [
  "bit-vec",
  "bytes 0.5.6",
@@ -1036,7 +1036,7 @@ dependencies = [
 
 [[package]]
 name = "sql_db_mapper_derive"
-version = "0.0.4"
+version = "0.1.0"
 dependencies = [
  "proc-macro2",
  "quote",

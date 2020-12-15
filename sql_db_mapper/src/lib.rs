@@ -119,12 +119,8 @@ version = "0.1.0"
 edition = "2018"
 
 [dependencies]
-sql_db_mapper_core = "0.0.4"
+sql_db_mapper_core = "0.1.0"
 postgres-types = { version = "0.1", features = ["derive", "with-chrono-0_4"] }
-chrono = "0.4"
-#version 1.6 of rust_decimal isn't compiling
-rust_decimal = { version = ">= 1.2, < 1.5", features = ["postgres"] }
-postgres-derive = "0.4"
 
 postgres  = { version = "0.17", optional = true }
 tokio-postgres = { version = "0.5.1", optional = true }

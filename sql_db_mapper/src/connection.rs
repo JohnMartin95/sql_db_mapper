@@ -101,7 +101,7 @@ impl MyClient {
 			.map(|v| Schema {
 				id: v.oid,
 				name: v.name,
-				owner_name: v.owner,
+				owner_name: v.rolname,
 				types: Vec::new(),
 				procs: Vec::new(),
 			})

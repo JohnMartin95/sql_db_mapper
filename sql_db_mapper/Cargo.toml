@@ -1,6 +1,6 @@
 [package]
 name = "sql_db_mapper"
-version = "0.0.4"
+version = "0.1.0"
 authors = ["John Martin <johnmartin1225+rust@gmail.com>"]
 license = "MIT OR Apache-2.0"
 description = "Maps a SQL database to rust structs and functions"
@@ -18,7 +18,7 @@ proc-macro2 = { version = "1.0" }
 structopt = "0.3"
 heck = "0.3.1"
 
-sql_db_mapper_core = { path = "../sql_db_mapper_core", version = "0.0.4" }
+sql_db_mapper_core = { path = "../sql_db_mapper_core", version = "0.1.0" }
 
 [lib]
 name = "sql_db_mapper"

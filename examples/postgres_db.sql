@@ -1,30 +1,16 @@
 
-DROP SCHEMA public CASCADE;
-DROP SCHEMA people CASCADE;
-DROP SCHEMA things CASCADE;
-DROP SCHEMA other CASCADE;
+DROP SCHEMA IF EXISTS public, people, things, other CASCADE;
 
 -- create schemas
-CREATE SCHEMA public
-	AUTHORIZATION postgres;
+CREATE SCHEMA public AUTHORIZATION postgres;
+COMMENT ON SCHEMA public IS 'standard public schema';
 
-COMMENT ON SCHEMA public
-	IS 'standard public schema';
+CREATE SCHEMA people AUTHORIZATION postgres;
+CREATE SCHEMA things AUTHORIZATION postgres;
+CREATE SCHEMA other AUTHORIZATION postgres;
 
 GRANT ALL ON SCHEMA public TO PUBLIC;
-GRANT ALL ON SCHEMA public TO postgres;
-
-CREATE SCHEMA people
-	AUTHORIZATION postgres;
-GRANT ALL ON SCHEMA people TO postgres;
-
-CREATE SCHEMA things
-	AUTHORIZATION postgres;
-GRANT ALL ON SCHEMA things TO postgres;
-
-CREATE SCHEMA other
-	AUTHORIZATION postgres;
-GRANT ALL ON SCHEMA other TO postgres;
+GRANT ALL ON SCHEMA public, people, things, other TO postgres;
 
 --people tables
 CREATE TABLE people.people(
@@ -35,7 +21,7 @@ CREATE TABLE people.people(
 );
 
 CREATE TABLE people.employees(
-	id INTEGER NOT NULL,
+	id SERIAL,
 	name VARCHAR(64) NOT NULL,
 	is_manager BOOLEAN NOT NULL,
 
@@ -46,6 +32,7 @@ CREATE TABLE people.employees(
 CREATE TABLE people.customers(
 	name VARCHAR(64) NOT NULL,
 
+	PRIMARY KEY (name),
 	FOREIGN KEY (name) REFERENCES people.people(name)
 );
 
@@ -56,17 +43,27 @@ CREATE TYPE things.item_type AS ENUM(
 );
 
 CREATE TABLE things.inventory(
-	id INT4 NOT NULL,
-	count_in_stock smallint NOT NULL,
+	id SERIAL,
+	count_in_stock SMALLINT NOT NULL,
 	item_type things.item_type,
-	price money,
+	--price MONEY,
 	price2 NUMERIC,
 	price3 NUMERIC(7,3),
 
 	PRIMARY KEY (id)
 );
 
+CREATE TABLE things.order_history(
+	customer VARCHAR(64) NOT NULL,
+	item_bought INTEGER NOT NULL,
+	date_purchased DATE,
 
+	PRIMARY KEY (customer, item_bought),
+	FOREIGN KEY (customer) REFERENCES people.people(name),
+	FOREIGN KEY (item_bought) REFERENCES things.inventory(id)
+);
+
+-- Simple test of extended types
 CREATE TYPE other.type_testing AS (
 	t_bigint bigint,
 	-- t_bigserial bigserial,
@@ -77,19 +74,19 @@ CREATE TYPE other.type_testing AS (
 	t_bytea bytea,
 	t_character character(10),
 	t_varchar varchar(10),
-	t_cidr cidr,
+	-- t_cidr cidr,
 	-- t_circle circle,
 	t_date date,
-	t_float8 float8,
-	t_inet inet,
+	-- t_float8 float8,
+	-- t_inet inet,
 	t_integer integer,
 	t_interval interval,
-	t_json json,
+	-- t_json json,
 	-- t_jsonb jsonb,
 	-- t_line line,
 	-- t_lseg lseg,
-	t_macaddr macaddr,
-	t_macaddr8 macaddr8,
+	-- t_macaddr macaddr,
+	-- t_macaddr8 macaddr8,
 	-- t_money money,
 	t_numeric numeric(5,5),
 	-- t_path path,
@@ -97,19 +94,19 @@ CREATE TYPE other.type_testing AS (
 	-- t_point point,
 	-- t_polygon polygon,
 	t_real real,
-	t_smallint smallint,
+	-- t_smallint smallint,
 	-- t_smallserial smallserial,
 	-- t_serial serial,
 	t_text text,
 	t_time time without time zone,
-	t_timetz time with time zone,
+	-- t_timetz time with time zone,
 	t_timestamp timestamp without time zone,
 	t_timestamptz timestamp with time zone,
 	-- t_tsquery tsquery,
 	-- t_tsvector tsvector,
 	-- t_txid_snapshot txid_snapshot,
 	t_uuid uuid,
-	t_xml xml
+	--t_xml xml
 );
 
 CREATE TYPE other.array_test AS (

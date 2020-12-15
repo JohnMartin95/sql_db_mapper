@@ -11,7 +11,7 @@ ORDER BY ns.oid ASC";
 pub struct GetSchemas {
 	pub oid: u32,
 	pub name: String,
-	pub owner: String,
+	pub owner: u32,
 	pub rolname: String,
 }
 
