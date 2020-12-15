@@ -332,6 +332,7 @@ impl MyClient {
 				type_name: v.typ_name,
 				type_ns_name: v.nspname,
 				not_null: v.not_null,
+				num_dimentions: v.num_dimentions,
 			})
 			.collect()
 	}

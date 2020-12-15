@@ -86,11 +86,15 @@ pub fn composite_to_ast(c: &PsqlCompositeType, name: &str, opt: &Opt) -> TokenSt
 		let field_name = format_heck(&v.name, opt, SnakeCase);
 		let schema_name = format_heck(&v.type_ns_name, opt, SnakeCase);
 		let type_name = format_heck(&v.type_name, opt, CamelCase);
-		if v.not_null {
-			quote! { pub #field_name : super::#schema_name::#type_name }
+		let mut field_type = if v.not_null {
+			quote! { super::#schema_name::#type_name }
 		} else {
-			quote! { pub #field_name : Option<super::#schema_name::#type_name> }
+			quote! { Option<super::#schema_name::#type_name> }
+		};
+		for _ in 0..v.num_dimentions {
+			field_type = quote! { Vec<#field_type> };
 		}
+		quote! { pub #field_name : #field_type }
 	});
 	let derives = get_derives();
 
@@ -110,13 +114,15 @@ pub fn base_to_ast(b: &PsqlBaseType, opt: &Opt) -> TokenStream {
 		16 => quote! { std::primitive::bool },
 		17 => quote! { Vec<u8> },
 		18 => quote! { i8 },
+		19 | 25 | 1042 | 1043 => quote! { String },
 		20 => quote! { i64 },
 		21 => quote! { i16 },
 		23 => quote! { i32 },
 		26 => quote! { u32 },
-		19 | 25 | 1042 | 1043 => quote! { String },
+		114 | 3802 => quote! { serde_json::Value },
 		700 => quote!{ f32 },
 		701 => quote!{ f64 },
+		869 => quote!{ std::net::IpAddr },
 		1082 => quote! { chrono::NaiveDate },
 		1083 => quote! { chrono::NaiveTime },
 		1114 => quote! { chrono::NaiveDateTime },

@@ -66,7 +66,6 @@ CREATE TABLE things.order_history(
 -- Simple test of extended types
 CREATE TYPE other.type_testing AS (
 	t_bigint bigint,
-	-- t_bigserial bigserial,
 	-- t_bit bit(10),
 	-- t_varbit varbit(10),
 	t_boolean boolean,
@@ -94,9 +93,7 @@ CREATE TYPE other.type_testing AS (
 	-- t_point point,
 	-- t_polygon polygon,
 	t_real real,
-	-- t_smallint smallint,
-	-- t_smallserial smallserial,
-	-- t_serial serial,
+	t_smallint smallint,
 	t_text text,
 	t_time time without time zone,
 	-- t_timetz time with time zone,
@@ -105,10 +102,26 @@ CREATE TYPE other.type_testing AS (
 	-- t_tsquery tsquery,
 	-- t_tsvector tsvector,
 	-- t_txid_snapshot txid_snapshot,
-	t_uuid uuid,
+	t_uuid uuid
 	--t_xml xml
 );
+CREATE TABLE other.type_testing2(
+	t_bigserial bigserial,
+	t_serial serial,
+	t_smallserial smallserial
+);
+
 
 CREATE TYPE other.array_test AS (
 	some_ints integer[5]
+);
+CREATE TABLE other.array_test2(
+	some_ints integer[5] NOT NULL,
+	text0 text NOT NULL,
+	text1 text[] NOT NULL,
+	text2 text[][] NOT NULL,
+	text3 text[][][] NOT NULL,
+	ignored_size text[1][2][3] NOT NULL,
+
+	PRIMARY KEY (some_ints)
 );

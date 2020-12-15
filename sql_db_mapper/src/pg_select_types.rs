@@ -58,7 +58,8 @@ pub const GET_COLUMNS: &str = "SELECT attnum,
 	nspname,
 	attlen,
 	atttypmod,
-	attnotnull
+	attnotnull,
+	attndims
 FROM pg_attribute a
 LEFT JOIN pg_type b ON atttypid = b.oid
 LEFT JOIN pg_namespace c ON typnamespace = c.oid
@@ -75,6 +76,7 @@ pub struct GetColumns {
 	pub len: i16,
 	pub typ_mod: i32,
 	pub not_null: bool,
+	pub num_dimentions : i32,
 }
 
 pub const GET_DOMAIN_BASE: &str = "SELECT t2.oid,
