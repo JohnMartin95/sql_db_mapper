@@ -38,6 +38,7 @@ pub use bit_vec;
 mod try_from_row;
 pub use try_from_row::TryFromRow;
 
+use serde::{Deserialize, Serialize};
 #[cfg(feature = "time")]
 /// Wrapper type around a [`time::Duration`] that implements [`ToSql`], [`FromSql`], and [`TryFromRow`]
 ///
@@ -45,7 +46,7 @@ pub use try_from_row::TryFromRow;
 /// [`ToSql`]: https://docs.rs/postgres-types/0.1/postgres_types/trait.ToSql.html
 /// [`FromSql`]: https://docs.rs/postgres-types/0.1/postgres_types/trait.FromSql.html
 /// [`TryFromRow`]: ./trait.TryFromRow.html
-#[cfg_attr(feature = "with_serde", derive(Serialize, Deserialize))]
+#[derive(Serialize, Deserialize)]
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Interval {
 	pub dur: time::Duration,

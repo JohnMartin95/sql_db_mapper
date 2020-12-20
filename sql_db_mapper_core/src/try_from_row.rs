@@ -85,10 +85,5 @@ try_from_row!(uuid::Uuid);
 try_from_row!(bit_vec::BitVec);
 
 
-// optional serialization
-#[cfg(feature = "with_serde")]
-use serde::{Deserialize, Serialize};
-
-
 #[cfg(feature = "time")]
 try_from_row!(Interval);
