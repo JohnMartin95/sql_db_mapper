@@ -123,10 +123,9 @@ sql_db_mapper_core = "0.1.0"
 postgres-types = { version = "0.1", features = ["derive", "with-chrono-0_4"] }
 async-trait = { version = "0.1.22", optional = true }
 
-serde = { version = "1.0", features = ["derive"], optional = true }
+serde = { version = "1.0", features = ["derive"] }
 
 [features]
-with_serde = ["serde", "sql_db_mapper_core/with_serde"]
 sync = []
 async = ["async-trait"]
 "#;

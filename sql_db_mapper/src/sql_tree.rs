@@ -10,6 +10,14 @@ impl FullDB {
 	pub fn add_schema(&mut self, schema: Schema) {
 		self.schemas.push(schema);
 	}
+
+	pub fn no_types(&self) -> bool {
+		self.schemas.iter().all(|v| v.no_types())
+	}
+
+	pub fn no_procs(&self) -> bool {
+		self.schemas.iter().all(|v| v.no_procs())
+	}
 }
 
 /// Database schema. Contains all Types and procedures defined inside
@@ -30,6 +38,14 @@ impl Schema {
 
 	pub fn append_types(&mut self, mut all_types: Vec<PsqlType>) {
 		self.types.append(&mut all_types);
+	}
+
+	pub fn no_types(&self) -> bool {
+		self.types.is_empty()
+	}
+
+	pub fn no_procs(&self) -> bool {
+		self.procs.is_empty()
 	}
 }
 
