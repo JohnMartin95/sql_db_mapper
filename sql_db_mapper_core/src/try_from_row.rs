@@ -49,6 +49,34 @@ try_from_row!(std::collections::HashMap<String, Option<String>>);
 try_from_row!(std::time::SystemTime);
 try_from_row!(std::net::IpAddr);
 
+
+// Provide auto implementations for tuples (usefule for when doing quick+dirty sql)
+use postgres_types::FromSqlOwned;
+macro_rules! try_from_tuple {
+	($($typ_name:ident),*, $($number:literal),*) => {
+		impl< $($typ_name:FromSqlOwned),* > TryFromRow for ($($typ_name),*,) {
+			fn from_row(row: &Row) -> Result<Self, SqlError> {
+				Ok((
+					$(row.try_get($number)?),*,
+				))
+			}
+		}
+	};
+}
+try_from_tuple!(T1, 1);
+try_from_tuple!(T1, T2, 1, 2);
+try_from_tuple!(T1, T2, T3, 1, 2, 3);
+try_from_tuple!(T1, T2, T3, T4, 1, 2, 3, 4);
+try_from_tuple!(T1, T2, T3, T4, T5, 1, 2, 3, 4, 5);
+try_from_tuple!(T1, T2, T3, T4, T5, T6, 1, 2, 3, 4, 5, 6);
+try_from_tuple!(T1, T2, T3, T4, T5, T6, T7, 1, 2, 3, 4, 5, 6, 7);
+try_from_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, 1, 2, 3, 4, 5, 6, 7, 8);
+try_from_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, 1, 2, 3, 4, 5, 6, 7, 8, 9);
+try_from_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, TA, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+try_from_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, TA, TB, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11);
+try_from_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, TA, TB, TC, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
+
+
 // chrono
 #[cfg(feature = "chrono")]
 try_from_row!(chrono::NaiveDate);
