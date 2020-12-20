@@ -179,7 +179,7 @@ pub fn simple_composite_to_ast(c: &NamesAndTypes, name: &str, opt: &Opt) -> Toke
 
 fn get_derives() -> TokenStream {
 	quote! {
-		#[cfg_attr(feature = "with_serde", derive(Serialize, Deserialize))]
+		#[derive(Serialize, Deserialize)]
 		#[derive(Debug, Clone, TryFromRow, ToSql, FromSql)]
 	}
 }

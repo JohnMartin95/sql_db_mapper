@@ -68,6 +68,7 @@ Features a derive macro from TryFromRow (defined in sql_db_mapper_core)
 * remove dependencies from generated code
 * allow for proper user configured rustfmt usage
 * Fix how pg_catalouge is populated so optional dependencies are used or not used correctly
+* update README with how to use as a build script
 
 ## License
 

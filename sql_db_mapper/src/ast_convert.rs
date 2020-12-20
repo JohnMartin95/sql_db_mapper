@@ -175,7 +175,6 @@ impl FullDB {
 		let schemas = self.schemas.iter().map(|v| v.get_types_module(opt));
 
 		quote! {
-			#[cfg(feature = "with_serde")]
 			use serde::{
 				Serialize,
 				Deserialize,
