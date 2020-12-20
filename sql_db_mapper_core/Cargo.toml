@@ -14,6 +14,7 @@ edition = "2018"
 [dependencies]
 # dependency for TryFromRow trait which uses Row and Error types
 tokio-postgres = { version = "0.6" }
+postgres = "0.18"
 # general postgres dependencies
 postgres-types = { version = "0.1" }
 # derives

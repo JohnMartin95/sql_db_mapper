@@ -121,17 +121,14 @@ edition = "2018"
 [dependencies]
 sql_db_mapper_core = "0.1.0"
 postgres-types = { version = "0.1", features = ["derive", "with-chrono-0_4"] }
-
-postgres  = { version = "0.17", optional = true }
-tokio-postgres = { version = "0.5.1", optional = true }
 async-trait = { version = "0.1.22", optional = true }
 
 serde = { version = "1.0", features = ["derive"], optional = true }
 
 [features]
 with_serde = ["serde", "sql_db_mapper_core/with_serde"]
-sync = ["postgres"]
-async = ["tokio-postgres", "async-trait"]
+sync = []
+async = ["async-trait"]
 "#;
 
 		dependencies
@@ -139,24 +136,18 @@ async = ["tokio-postgres", "async-trait"]
 
 	/// Build a call string that could be used to get the same options
 	pub fn get_call_string(&self) -> String {
-		// let sync  =  if self.sync  { " -s" } else { "" };
 		let ugly = if self.ugly { " -u" } else { "" };
-		// let serde =  if self.serde { " --serde" } else { "" };
 		let dir = if self.dir { " --dir" } else { "" };
 		let rust_case = if self.rust_case { " --rust_case" } else { "" };
-		let use_tuples = if self.use_tuples == Tuples::ForOverloads {
-			String::new()
-		} else {
-			format!(" --use-tuples {}", self.use_tuples.to_str())
-		};
+		let use_tuples = if self.use_tuples == Tuples::ForOverloads { String::new() } else { format!(" --use-tuples {}", self.use_tuples.to_str()) };
+		let no_functions = if self.no_functions { " --no_functions" } else { "" };
 		format!(
-			"sql_db_mapper{ugly}{dir}{rust_case}{use_tuples}",
-			// sync = sync,
+			"sql_db_mapper{ugly}{dir}{rust_case}{use_tuples}{no_functions}",
 			ugly = ugly,
-			// serde = serde,
 			dir = dir,
 			rust_case = rust_case,
 			use_tuples = use_tuples,
+			no_functions = no_functions,
 		)
 	}
 

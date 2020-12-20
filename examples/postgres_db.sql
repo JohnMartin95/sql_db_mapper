@@ -125,3 +125,26 @@ CREATE TABLE other.array_test2(
 
 	PRIMARY KEY (some_ints)
 );
+
+CREATE FUNCTION people.new_person(name text, birthday DATE)  RETURNS void
+LANGUAGE SQL
+AS $$
+INSERT INTO people.people(name, birthday) VALUES (name, birthday);
+$$;
+
+CREATE FUNCTION people.add3(x integer)  RETURNS integer
+AS $$
+BEGIN
+	RETURN x + 3;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE FUNCTION people.add3(x integer, y integer)  RETURNS integer
+AS $$
+BEGIN
+RETURN x - y + 3;
+END;
+$$ LANGUAGE plpgsql;
+
+
+

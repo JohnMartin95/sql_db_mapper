@@ -16,7 +16,8 @@
 //reexports
 pub use sql_db_mapper_derive::*;
 pub use postgres_types::{ FromSql, ToSql };
-pub use tokio_postgres::{row::Row, Error as SqlError};
+pub use tokio_postgres::{row::Row, Error as SqlError, Client as AsyncClient};
+pub use postgres::{Client as SyncClient};
 
 #[cfg(feature = "chrono")]
 pub use chrono;

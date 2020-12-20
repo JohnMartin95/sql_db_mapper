@@ -194,9 +194,9 @@ impl FullDB {
 		let schemas = self.schemas.iter().map(|v| v.get_funcs_module(opt, true));
 
 		quote! {
-			pub use postgres::{
-				Client,
-				Error as SqlError,
+			pub use super::orm::{
+				SyncClient as Client,
+				SqlError,
 			};
 			use sql_db_mapper_core::TryFromRow;
 
@@ -209,9 +209,9 @@ impl FullDB {
 		let schemas = self.schemas.iter().map(|v| v.get_funcs_module(opt, true));
 
 		quote! {
-			pub use tokio_postgres::{
-				Client,
-				Error as SqlError,
+			pub use super::orm::{
+				AsyncClient as Client,
+				SqlError,
 			};
 			use sql_db_mapper_core::TryFromRow;
 			pub use std::future::Future;
