@@ -57,8 +57,8 @@ pub struct Opt {
 	pub use_tuples: Tuples,
 
 	/// String to connect to database, see tokio_postgres::Config for details.
-	/// If not provided envirment variable SQL_MAP_CONN is checked instead
-	#[structopt(long, env = "SQL_MAP_CONN")]
+	/// If not provided environment variable DATABASE_URL is checked instead
+	#[structopt(long, env = "DATABASE_URL")]
 	pub conn: String,
 
 	/// Output file, stdout if not present
