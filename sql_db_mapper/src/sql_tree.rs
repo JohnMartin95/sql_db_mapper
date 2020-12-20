@@ -82,7 +82,7 @@ pub struct Column {
 	pub type_name: String,
 	pub type_ns_name: String,
 	pub not_null: bool,
-	pub num_dimentions: i32, 
+	pub num_dimentions: i32,
 }
 
 #[derive(Debug, Clone)]

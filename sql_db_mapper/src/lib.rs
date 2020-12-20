@@ -139,7 +139,11 @@ async = ["async-trait"]
 		let ugly = if self.ugly { " -u" } else { "" };
 		let dir = if self.dir { " --dir" } else { "" };
 		let rust_case = if self.rust_case { " --rust_case" } else { "" };
-		let use_tuples = if self.use_tuples == Tuples::ForOverloads { String::new() } else { format!(" --use-tuples {}", self.use_tuples.to_str()) };
+		let use_tuples = if self.use_tuples == Tuples::ForOverloads {
+			String::new()
+		} else {
+			format!(" --use-tuples {}", self.use_tuples.to_str())
+		};
 		let no_functions = if self.no_functions { " --no_functions" } else { "" };
 		format!(
 			"sql_db_mapper{ugly}{dir}{rust_case}{use_tuples}{no_functions}",
