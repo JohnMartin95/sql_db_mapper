@@ -1,7 +1,6 @@
 use super::{
 	Row,
 	SqlError,
-	Interval,
 };
 
 
@@ -63,18 +62,18 @@ macro_rules! try_from_tuple {
 		}
 	};
 }
-try_from_tuple!(T1, 1);
-try_from_tuple!(T1, T2, 1, 2);
-try_from_tuple!(T1, T2, T3, 1, 2, 3);
-try_from_tuple!(T1, T2, T3, T4, 1, 2, 3, 4);
-try_from_tuple!(T1, T2, T3, T4, T5, 1, 2, 3, 4, 5);
-try_from_tuple!(T1, T2, T3, T4, T5, T6, 1, 2, 3, 4, 5, 6);
-try_from_tuple!(T1, T2, T3, T4, T5, T6, T7, 1, 2, 3, 4, 5, 6, 7);
-try_from_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, 1, 2, 3, 4, 5, 6, 7, 8);
-try_from_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, 1, 2, 3, 4, 5, 6, 7, 8, 9);
-try_from_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, TA, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
-try_from_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, TA, TB, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11);
-try_from_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, TA, TB, TC, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
+try_from_tuple!(A, 1);
+try_from_tuple!(A, B, 1, 2);
+try_from_tuple!(A, B, C, 1, 2, 3);
+try_from_tuple!(A, B, C, D, 1, 2, 3, 4);
+try_from_tuple!(A, B, C, D, E, 1, 2, 3, 4, 5);
+try_from_tuple!(A, B, C, D, E, F, 1, 2, 3, 4, 5, 6);
+try_from_tuple!(A, B, C, D, E, F, G, 1, 2, 3, 4, 5, 6, 7);
+try_from_tuple!(A, B, C, D, E, F, G, H, 1, 2, 3, 4, 5, 6, 7, 8);
+try_from_tuple!(A, B, C, D, E, F, G, H, I, 1, 2, 3, 4, 5, 6, 7, 8, 9);
+try_from_tuple!(A, B, C, D, E, F, G, H, I, J, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+try_from_tuple!(A, B, C, D, E, F, G, H, I, J, K, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11);
+try_from_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
 
 
 // chrono
@@ -89,16 +88,12 @@ try_from_row!(chrono::DateTime<chrono::Utc>);
 #[cfg(feature = "rust_decimal")]
 try_from_row!(rust_decimal::Decimal);
 
-// eui48
-#[cfg(feature = "eui48")]
-try_from_row!(eui48::MacAddress);
-
 // geo_types
-#[cfg(feature = "geo_types")]
+#[cfg(feature = "geo-types")]
 try_from_row!(geo_types::Point<f64>);
-#[cfg(feature = "geo_types")]
+#[cfg(feature = "geo-types")]
 try_from_row!(geo_types::Rect<f64>);
-#[cfg(feature = "geo_types")]
+#[cfg(feature = "geo-types")]
 try_from_row!(geo_types::LineString<f64>);
 
 // serde_json
@@ -109,9 +104,5 @@ try_from_row!(serde_json::Value);
 #[cfg(feature = "uuid")]
 try_from_row!(uuid::Uuid);
 // bit_vec
-#[cfg(feature = "bit_vec")]
+#[cfg(feature = "bit-vec")]
 try_from_row!(bit_vec::BitVec);
-
-
-#[cfg(feature = "time")]
-try_from_row!(Interval);

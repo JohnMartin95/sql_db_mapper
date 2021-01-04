@@ -79,7 +79,7 @@ CREATE TYPE other.type_testing AS (
 	-- t_float8 float8,
 	-- t_inet inet,
 	t_integer integer,
-	t_interval interval,
+	-- t_interval interval,
 	-- t_json json,
 	-- t_jsonb jsonb,
 	-- t_line line,

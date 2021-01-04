@@ -56,6 +56,10 @@ pub struct Opt {
 	#[structopt(long, default_value = "overloads")]
 	pub use_tuples: Tuples,
 
+	///TODO
+	#[structopt(long, use_delimiter = true)]
+	pub third_party : Vec<ThirdParty>,
+
 	/// String to connect to database, see tokio_postgres::Config for details.
 	/// If not provided environment variable DATABASE_URL is checked instead
 	#[structopt(long, env = "DATABASE_URL")]
@@ -100,6 +104,48 @@ impl Tuples {
 		}
 	}
 }
+#[derive(Debug, StructOpt, Clone, Copy, PartialEq, Eq)]
+pub enum ThirdParty {
+	Chrono,
+	Time,
+	Eui48,
+	GeoTypes,
+	SerdeJson,
+	Uuid,
+	BitVec,
+	RustDecimal,
+}
+impl std::str::FromStr for ThirdParty {
+	type Err = String;
+
+	fn from_str(s: &str) -> Result<ThirdParty, String> {
+		match s {
+			"chrono" => Ok(ThirdParty::Chrono),
+			"time" => Ok(ThirdParty::Time),
+			"eui48" => Ok(ThirdParty::Eui48),
+			"geo_types" => Ok(ThirdParty::GeoTypes),
+			"serde_json" => Ok(ThirdParty::SerdeJson),
+			"uuid" => Ok(ThirdParty::Uuid),
+			"bit_vec" => Ok(ThirdParty::BitVec),
+			"rust_decimal" => Ok(ThirdParty::RustDecimal),
+			_ => Err(String::from(s)),
+		}
+	}
+}
+impl ThirdParty {
+	fn to_str(&self) -> &'static str {
+		match self {
+			ThirdParty::Chrono => "chrono",
+			ThirdParty::Time => "time",
+			ThirdParty::Eui48 => "eui48",
+			ThirdParty::GeoTypes => "geo_types",
+			ThirdParty::SerdeJson => "serde_json",
+			ThirdParty::Uuid => "uuid",
+			ThirdParty::BitVec => "bit_vec",
+			ThirdParty::RustDecimal => "rust_decimal",
+		}
+	}
+}
 
 impl Opt {
 	/// Produce the Cargo.toml file contents (the dependecies of the generated code)
@@ -113,13 +159,12 @@ impl Opt {
 			.flatten()
 			.unwrap_or("my_db_mapping");
 
-		let mut dependencies = format!("[package]\nname = \"{}\"", package_name);
-		dependencies += r#"
+		let dependencies = format!("[package]\nname = \"{}\"", package_name) + r#"
 version = "0.1.0"
 edition = "2018"
 
 [dependencies]
-sql_db_mapper_core = "0.1.0"
+sql_db_mapper_core = { version = "0.1.0", features = ["# + &self.get_dependencies() + r#"] }
 postgres-types = { version = "0.1", features = ["derive", "with-chrono-0_4"] }
 async-trait = { version = "0.1.22", optional = true }
 
@@ -131,6 +176,34 @@ async = ["async-trait"]
 "#;
 
 		dependencies
+	}
+	fn get_dependencies(&self) -> String {
+		let mut ret = String::new();
+		if self.third_party.contains(&ThirdParty::Chrono) {
+			ret += r#""with-chrono-0_4", "#;
+		}
+		if self.third_party.contains(&ThirdParty::Time) {
+			ret += r#""with-time-0_2", "#;
+		}
+		if self.third_party.contains(&ThirdParty::Eui48) {
+			ret += r#""with-eui48-0_4", "#;
+		}
+		if self.third_party.contains(&ThirdParty::GeoTypes) {
+			ret += r#""with-geo-types-0_4", "#;
+		}
+		if self.third_party.contains(&ThirdParty::SerdeJson) {
+			ret += r#""with-serde_json-1", "#;
+		}
+		if self.third_party.contains(&ThirdParty::Uuid) {
+			ret += r#""with-uuid-0_8", "#;
+		}
+		if self.third_party.contains(&ThirdParty::BitVec) {
+			ret += r#""with-bit-vec-0_6", "#;
+		}
+		if self.third_party.contains(&ThirdParty::RustDecimal) {
+			ret += r#""with-rust_decimal-1", "#;
+		}
+		ret
 	}
 
 	/// Build a call string that could be used to get the same options
@@ -159,6 +232,10 @@ async = ["async-trait"]
 			.expect("Failed to connect to database, please check your connection string and try again");
 
 		connection::MyClient::new(client)
+	}
+
+	fn uses_lib(&self, lib_name: ThirdParty) -> bool {
+		self.third_party.contains(&lib_name)
 	}
 }
 
