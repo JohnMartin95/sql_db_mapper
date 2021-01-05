@@ -65,10 +65,9 @@ Features a derive macro from TryFromRow (defined in sql_db_mapper_core)
 * Add option for use of TLS connection
 
 ### Present TODOs
-* remove dependencies from generated code
 * allow for proper user configured rustfmt usage
-* Fix how pg_catalouge is populated so optional dependencies are used or not used correctly
 * update README with how to use as a build script
+* update README with common compiling errors that may happen due to dependencies
 
 ## License
 
