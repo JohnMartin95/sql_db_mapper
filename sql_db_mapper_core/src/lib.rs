@@ -12,25 +12,24 @@
 //! [`Interval`]: ./struct.Interval.html
 
 //reexports
+pub use postgres::Client as SyncClient;
+pub use postgres_types::{FromSql, ToSql};
 pub use sql_db_mapper_derive::*;
-pub use postgres_types::{ FromSql, ToSql };
-pub use tokio_postgres::{row::Row, Error as SqlError, Client as AsyncClient};
-pub use postgres::{Client as SyncClient};
+pub use tokio_postgres::{row::Row, Client as AsyncClient, Error as SqlError};
 
+#[cfg(feature = "bit-vec")]
+pub use bit_vec;
 #[cfg(feature = "chrono")]
 pub use chrono;
-#[cfg(feature = "rust_decimal")]
-pub use rust_decimal;
 #[cfg(feature = "geo-types")]
 pub use geo_types;
+#[cfg(feature = "rust_decimal")]
+pub use rust_decimal;
 #[cfg(feature = "serde_json")]
 pub use serde_json;
 #[cfg(feature = "uuid")]
 pub use uuid;
-#[cfg(feature = "bit-vec")]
-pub use bit_vec;
 
 /// Implementation of `TryFromRow` for various types
 mod try_from_row;
 pub use try_from_row::TryFromRow;
-

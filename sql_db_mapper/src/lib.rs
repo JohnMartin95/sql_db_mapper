@@ -58,7 +58,7 @@ pub struct Opt {
 
 	///TODO
 	#[structopt(long, use_delimiter = true)]
-	pub third_party : Vec<ThirdParty>,
+	pub third_party: Vec<ThirdParty>,
 
 	/// String to connect to database, see tokio_postgres::Config for details.
 	/// If not provided environment variable DATABASE_URL is checked instead
@@ -159,12 +159,15 @@ impl Opt {
 			.flatten()
 			.unwrap_or("my_db_mapping");
 
-		let dependencies = format!("[package]\nname = \"{}\"", package_name) + r#"
+		let dependencies = format!("[package]\nname = \"{}\"", package_name)
+			+ r#"
 version = "0.1.0"
 edition = "2018"
 
 [dependencies]
-sql_db_mapper_core = { version = "0.1.0", features = ["# + &self.get_dependencies() + r#"] }
+sql_db_mapper_core = { version = "0.1.0", features = ["#
+			+ &self.get_dependencies()
+			+ r#"] }
 postgres-types = { version = "0.1", features = ["derive", "with-chrono-0_4"] }
 async-trait = { version = "0.1.22", optional = true }
 
@@ -177,6 +180,7 @@ async = ["async-trait"]
 
 		dependencies
 	}
+
 	fn get_dependencies(&self) -> String {
 		let mut ret = String::new();
 		if self.third_party.contains(&ThirdParty::Chrono) {

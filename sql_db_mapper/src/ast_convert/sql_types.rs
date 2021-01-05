@@ -111,22 +111,29 @@ pub fn composite_to_ast(c: &PsqlCompositeType, name: &str, opt: &Opt) -> TokenSt
 
 /// like `std::try` but returns an empty TokenStream on None
 macro_rules! my_try {
-    ($expr:expr) => {
-        match $expr {
-            std::option::Option::Some(val) => val,
-            std::option::Option::None => { return quote! {}; }
-        }
-    };
+	($expr:expr) => {
+		match $expr {
+			std::option::Option::Some(val) => val,
+			std::option::Option::None => {
+				return quote! {};
+			},
+		}
+	};
 }
 
 /// creates the syn node for a base type (typedef)
 pub fn base_to_ast(b: &PsqlBaseType, opt: &Opt) -> TokenStream {
-	let third_party = | lib_name: ThirdParty, tokens: TokenStream| -> Option<TokenStream> {
+	let third_party = |lib_name: ThirdParty, tokens: TokenStream| -> Option<TokenStream> {
 		if opt.uses_lib(lib_name) {
 			Some(tokens)
 		} else {
 			if opt.debug {
-				println!("Enable {} dependency to provide mapping for postgres type `{}` with oid : {}", lib_name.to_str(), b.name, b.oid);
+				println!(
+					"Enable {} dependency to provide mapping for postgres type `{}` with oid : {}",
+					lib_name.to_str(),
+					b.name,
+					b.oid
+				);
 			}
 			None
 		}
@@ -148,8 +155,20 @@ pub fn base_to_ast(b: &PsqlBaseType, opt: &Opt) -> TokenStream {
 		869 => quote! { std::net::IpAddr },
 		1082 => my_try!(third_party(Chrono, quote! { chrono::NaiveDate })),
 		1083 => my_try!(third_party(Chrono, quote! { chrono::NaiveTime })),
-		1114 => if opt.uses_lib(Chrono) { quote! { chrono::NaiveDateTime } } else { quote! { std::time::SystemTime }},
-		1184 => if opt.uses_lib(Chrono) { quote! { chrono::DateTime<chrono::Utc> } } else { quote! { std::time::SystemTime }},
+		1114 => {
+			if opt.uses_lib(Chrono) {
+				quote! { chrono::NaiveDateTime }
+			} else {
+				quote! { std::time::SystemTime }
+			}
+		},
+		1184 => {
+			if opt.uses_lib(Chrono) {
+				quote! { chrono::DateTime<chrono::Utc> }
+			} else {
+				quote! { std::time::SystemTime }
+			}
+		},
 		1700 => my_try!(third_party(RustDecimal, quote! { rust_decimal::Decimal })),
 		2278 => quote! { () },
 		2950 => my_try!(third_party(Uuid, quote! { uuid::Uuid })),

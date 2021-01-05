@@ -1,7 +1,4 @@
-use super::{
-	Row,
-	SqlError,
-};
+use super::{Row, SqlError};
 
 
 /// Converts from a [`tokio_postgres::Row`]. Implementations are provided for rows that contain only a single value of several types that implement [`FromSql`] (currently no check is done that the row only contained one value)
