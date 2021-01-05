@@ -45,11 +45,12 @@ use quote::quote;
 /// ```
 pub fn type_to_rust(typ: &PsqlType, opt: &Opt) -> TokenStream {
 	use PsqlTypType::*;
+	let stripped_name = typ.name.clone().replace(|c: char| !(c.is_ascii_alphanumeric() || c=='_'), "_");
 	match &typ.typ {
-		Enum(e) => enum_to_ast(e, &typ.name, opt),
-		Composite(c) => composite_to_ast(c, &typ.name, opt),
+		Enum(e) => enum_to_ast(e, &stripped_name, opt),
+		Composite(c) => composite_to_ast(c, &stripped_name, opt),
 		Base(b) => base_to_ast(b, opt),
-		Domain(d) => domain_to_ast(d, &typ.name, opt),
+		Domain(d) => domain_to_ast(d, &stripped_name, opt),
 		Other(oid) => {
 			if *oid == 2278 {
 				let name_type = format_heck(&typ.name, opt, CamelCase);
