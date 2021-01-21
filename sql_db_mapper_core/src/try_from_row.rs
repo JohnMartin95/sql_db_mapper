@@ -86,12 +86,12 @@ try_from_row!(chrono::DateTime<chrono::Utc>);
 try_from_row!(rust_decimal::Decimal);
 
 // geo_types
-#[cfg(feature = "geo-types")]
-try_from_row!(geo_types::Point<f64>);
-#[cfg(feature = "geo-types")]
-try_from_row!(geo_types::Rect<f64>);
-#[cfg(feature = "geo-types")]
-try_from_row!(geo_types::LineString<f64>);
+// #[cfg(feature = "geo-types")]
+// try_from_row!(geo_types::Point<f64>);
+// #[cfg(feature = "geo-types")]
+// try_from_row!(geo_types::Rect<f64>);
+// #[cfg(feature = "geo-types")]
+// try_from_row!(geo_types::LineString<f64>);
 
 // serde_json
 #[cfg(feature = "serde_json")]

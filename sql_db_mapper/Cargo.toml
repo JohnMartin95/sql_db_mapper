@@ -12,7 +12,7 @@ readme="README.md"
 edition = "2018"
 
 [dependencies]
-postgres  = { version = "0.18", features = ["with-chrono-0_4"] }
+postgres  = { version = "0.19.0", features = ["with-chrono-0_4"] }
 quote = { version = "1.0" }
 proc-macro2 = { version = "1.0" }
 structopt = "0.3"

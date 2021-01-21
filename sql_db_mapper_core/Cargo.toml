@@ -11,21 +11,21 @@ edition = "2018"
 
 [dependencies]
 # dependency for TryFromRow trait which uses Row and Error types
-tokio-postgres = "0.6"
-postgres = "0.18"
+tokio-postgres = "0.7.0"
+postgres = "0.19.0"
 # general postgres dependencies
-postgres-types = "0.1"
+postgres-types = "0.2"
 # derives
 sql_db_mapper_derive = { path = "../sql_db_mapper_derive", version = "0.1.0" }
 # crates with types that implement FromSql
-rust_decimal = { version = "1.8", features = ["db-postgres", "serde"], optional = true }
+rust_decimal = { version = "1.10", features = ["db-postgres", "serde"], optional = true }
 bit-vec    = { version = "0.6", features = ["serde"], optional = true }
 chrono     = { version = "0.4", features = ["serde"], optional = true }
-geo-types  = { version = "0.6", features = ["serde"], optional = true }
+# geo-types  = { version = "0.7.0", features = ["serde"], optional = true }
 serde_json = { version = "1.0", optional = true }
 uuid       = { version = "0.8", features = ["serde"], optional = true }
 # used by ToSql
-bytes = "0.5.6"
+bytes = "1.0.1"
 # serde
 # I'd love to feature gate the serde dependency but there's no feasible way without weak-dep-features: https://github.com/rust-lang/cargo/issues/8832
 serde = { version = "1.0", features = ["derive"] }
@@ -36,11 +36,11 @@ default = ["all-features"]
 with-rust_decimal-1  = ["rust_decimal"]
 with-bit-vec-0_6     = ["bit-vec",    "postgres-types/with-bit-vec-0_6"]
 with-chrono-0_4      = ["chrono",     "postgres-types/with-chrono-0_4"]
-with-geo-types-0_6   = ["geo-types",  "postgres-types/with-geo-types-0_6"]
+# with-geo-types-0_6   = ["geo-types",  "postgres-types/with-geo-types-0_6"]
 with-serde_json-1    = ["serde_json", "postgres-types/with-serde_json-1"]
 with-uuid-0_8        = ["uuid",       "postgres-types/with-uuid-0_8"]
 
-all-features = ["with-rust_decimal-1", "with-bit-vec-0_6", "with-chrono-0_4", "with-geo-types-0_6", "with-serde_json-1", "with-uuid-0_8"]
+all-features = ["with-rust_decimal-1", "with-bit-vec-0_6", "with-chrono-0_4", "with-serde_json-1", "with-uuid-0_8"]
 
 [package.metadata.docs.rs]
 all-features = true
