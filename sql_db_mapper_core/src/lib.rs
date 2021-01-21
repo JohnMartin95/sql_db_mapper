@@ -17,6 +17,9 @@ pub use postgres_types::{FromSql, ToSql};
 pub use sql_db_mapper_derive::*;
 pub use tokio_postgres::{row::Row, Client as AsyncClient, Error as SqlError};
 
+pub use postgres;
+pub use tokio_postgres;
+
 #[cfg(feature = "bit-vec")]
 pub use bit_vec;
 #[cfg(feature = "chrono")]
