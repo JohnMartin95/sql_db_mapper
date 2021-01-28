@@ -39,7 +39,7 @@ OPTIONS:
         --rustfmt-config-path <rustfmt-config-path>    string passed to rustfmt --config-path
         --third-party <third-party>...
             A comma seperated list of third party crates which contain types that will be mapped to and from sql types.
-            Valid values are "bit-vec,chrono,eui48,geo-types,rust_decimal,serde_json,time,uuid"
+            Valid values are "bit_vec,chrono,eui48,geo_types,rust_decimal,serde_json,time,uuid"
         --use-tuples <use-tuples>
             How to use tuples (used by default for just overloads). Options: overloads (the default, use tuples to
             represent function overloading). all (Have all functions take a tuple for consitency). none (skip mapping
@@ -50,10 +50,8 @@ ARGS:
     <output>    Output file, stdout if not present
 ```
 ## Common Errors
-TODO
-
-## Usage in `build.rs` script
-TODO
+| cannot find type \`????\` in module \`super::pg_catalog\`  
+The type specified is only mapped by one of the third party crates. `postgres_types::FromSql` lists all the types that should appear except for `Numeric` which is mapped with `rust_decimal::Decimal`
 
 ---
 
@@ -69,7 +67,7 @@ Features a derive macro from TryFromRow (defined in sql_db_mapper_core)
 ### Possible Future Work
 * more options relating to how the code is generated
 	* Grab text from `COMMENT ON` and stick it in doc comments
-	* Allow functions that take (for example) an &varchar to take an &str (varchar is a typedef of String so functions would need to be generic like HashMap's get)
+	* Allow functions that take (for example) an &varchar to take an &str (varchar is a typedef of String so functions would need to be generic like HashMap's get most likely)
 * consider adding support for other popular databases as well or rust database libraries
 	* either through connecting to the database as is being currently done or possibly by parsing SQL itself
     * sqlx and diesel code generators would be useful

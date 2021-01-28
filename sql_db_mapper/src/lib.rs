@@ -57,7 +57,7 @@ pub struct Opt {
 	pub use_tuples: Tuples,
 
 	/// A comma seperated list of third party crates which contain types that will be mapped to and from sql types.
-	/// Valid values are "bit-vec,chrono,eui48,geo-types,rust_decimal,serde_json,time,uuid"
+	/// Valid values are "bit_vec,chrono,eui48,geo_types,rust_decimal,serde_json,time,uuid"
 	#[structopt(long, use_delimiter = true)]
 	pub third_party: Vec<ThirdParty>,
 
@@ -121,14 +121,14 @@ impl std::str::FromStr for ThirdParty {
 
 	fn from_str(s: &str) -> Result<ThirdParty, String> {
 		match s {
+			"bit_vec" => Ok(ThirdParty::BitVec),
 			"chrono" => Ok(ThirdParty::Chrono),
-			"time" => Ok(ThirdParty::Time),
 			"eui48" => Ok(ThirdParty::Eui48),
 			"geo_types" => Ok(ThirdParty::GeoTypes),
-			"serde_json" => Ok(ThirdParty::SerdeJson),
-			"uuid" => Ok(ThirdParty::Uuid),
-			"bit_vec" => Ok(ThirdParty::BitVec),
 			"rust_decimal" => Ok(ThirdParty::RustDecimal),
+			"serde_json" => Ok(ThirdParty::SerdeJson),
+			"time" => Ok(ThirdParty::Time),
+			"uuid" => Ok(ThirdParty::Uuid),
 			_ => Err(String::from(s)),
 		}
 	}
@@ -169,8 +169,8 @@ edition = "2018"
 sql_db_mapper_core = { version = "0.1.0", features = ["#
 			+ &self.get_dependencies()
 			+ r#"] }
-postgres-types = { version = "0.1", features = ["derive", "with-chrono-0_4"] }
-async-trait = { version = "0.1.22", optional = true }
+postgres-types = { version = "0.2", features = ["derive"] }
+async-trait = { version = "0.1", optional = true }
 
 serde = { version = "1.0", features = ["derive"] }
 
