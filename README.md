@@ -18,7 +18,7 @@ sql_db_mapper 0.1.0
 Generate a rust wrapper for a PostgreSQL database
 
 USAGE:
-    sql_db_mapper [FLAGS] [OPTIONS] --conn <conn> [output]
+    sql_db_mapper [FLAGS] [OPTIONS] --conn <conn> [--] [output]
 
 FLAGS:
     -d, --debug           Activate debug mode
@@ -37,6 +37,9 @@ OPTIONS:
             DATABASE_URL is checked instead
         --rustfmt-config <rustfmt-config>              string passed to rustfmt --config
         --rustfmt-config-path <rustfmt-config-path>    string passed to rustfmt --config-path
+        --third-party <third-party>...
+            A comma seperated list of third party crates which contain types that will be mapped to and from sql types.
+            Valid values are "bit-vec,chrono,eui48,geo-types,rust_decimal,serde_json,time,uuid"
         --use-tuples <use-tuples>
             How to use tuples (used by default for just overloads). Options: overloads (the default, use tuples to
             represent function overloading). all (Have all functions take a tuple for consitency). none (skip mapping
@@ -46,16 +49,24 @@ OPTIONS:
 ARGS:
     <output>    Output file, stdout if not present
 ```
+## Common Errors
+TODO
+
+## Usage in `build.rs` script
+TODO
+
+---
 
 ## sql_db_mapper_core
 Contains trait TryFromRow for converting from tokio-postgres Rows to Rust types and implements it for several common types  
-Also contains Interval struct for corresponding sql type
 Reexports types that are convertable to/from sql types
 
 ## sql_db_mapper_derive
 Features a derive macro from TryFromRow (defined in sql_db_mapper_core)
 
-### Future Work
+---
+
+### Possible Future Work
 * more options relating to how the code is generated
 	* Grab text from `COMMENT ON` and stick it in doc comments
 	* Allow functions that take (for example) an &varchar to take an &str (varchar is a typedef of String so functions would need to be generic like HashMap's get)
@@ -64,10 +75,7 @@ Features a derive macro from TryFromRow (defined in sql_db_mapper_core)
     * sqlx and diesel code generators would be useful
 * Add option for use of TLS connection
 
-### Present TODOs
-* allow for proper user configured rustfmt usage
-* update README with how to use as a build script
-* update README with common compiling errors that may happen due to dependencies
+---
 
 ## License
 

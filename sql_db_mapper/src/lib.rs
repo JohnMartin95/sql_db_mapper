@@ -56,7 +56,8 @@ pub struct Opt {
 	#[structopt(long, default_value = "overloads")]
 	pub use_tuples: Tuples,
 
-	///TODO
+	/// A comma seperated list of third party crates which contain types that will be mapped to and from sql types.
+	/// Valid values are "bit-vec,chrono,eui48,geo-types,rust_decimal,serde_json,time,uuid"
 	#[structopt(long, use_delimiter = true)]
 	pub third_party: Vec<ThirdParty>,
 
@@ -135,14 +136,14 @@ impl std::str::FromStr for ThirdParty {
 impl ThirdParty {
 	fn to_str(&self) -> &'static str {
 		match self {
-			ThirdParty::Chrono => "chrono",
-			ThirdParty::Time => "time",
-			ThirdParty::Eui48 => "eui48",
-			ThirdParty::GeoTypes => "geo_types",
-			ThirdParty::SerdeJson => "serde_json",
-			ThirdParty::Uuid => "uuid",
-			ThirdParty::BitVec => "bit_vec",
-			ThirdParty::RustDecimal => "rust_decimal",
+			ThirdParty::BitVec => "with-bit-vec-0_6",
+			ThirdParty::Chrono => "with-chrono-0_4",
+			ThirdParty::Eui48 => "with-eui48-0_4",
+			ThirdParty::GeoTypes => "with-geo-types-0_6",
+			ThirdParty::RustDecimal => "with-rust_decimal-1",
+			ThirdParty::SerdeJson => "with-serde_json-1",
+			ThirdParty::Uuid => "with-uuid-0_8",
+			ThirdParty::Time => "with-time-0_2",
 		}
 	}
 }
@@ -183,29 +184,29 @@ async = ["async-trait"]
 
 	fn get_dependencies(&self) -> String {
 		let mut ret = String::new();
+		if self.third_party.contains(&ThirdParty::BitVec) {
+			ret += r#""with-bit-vec-0_6", "#;
+		}
 		if self.third_party.contains(&ThirdParty::Chrono) {
 			ret += r#""with-chrono-0_4", "#;
-		}
-		if self.third_party.contains(&ThirdParty::Time) {
-			ret += r#""with-time-0_2", "#;
 		}
 		if self.third_party.contains(&ThirdParty::Eui48) {
 			ret += r#""with-eui48-0_4", "#;
 		}
 		if self.third_party.contains(&ThirdParty::GeoTypes) {
-			ret += r#""with-geo-types-0_4", "#;
+			ret += r#""with-geo-types-0_6", "#;
+		}
+		if self.third_party.contains(&ThirdParty::RustDecimal) {
+			ret += r#""with-rust_decimal-1", "#;
 		}
 		if self.third_party.contains(&ThirdParty::SerdeJson) {
 			ret += r#""with-serde_json-1", "#;
 		}
+		if self.third_party.contains(&ThirdParty::Time) {
+			ret += r#""with-time-0_2", "#;
+		}
 		if self.third_party.contains(&ThirdParty::Uuid) {
 			ret += r#""with-uuid-0_8", "#;
-		}
-		if self.third_party.contains(&ThirdParty::BitVec) {
-			ret += r#""with-bit-vec-0_6", "#;
-		}
-		if self.third_party.contains(&ThirdParty::RustDecimal) {
-			ret += r#""with-rust_decimal-1", "#;
 		}
 		ret
 	}
@@ -215,19 +216,26 @@ async = ["async-trait"]
 		let ugly = if self.ugly { " -u" } else { "" };
 		let dir = if self.dir { " --dir" } else { "" };
 		let rust_case = if self.rust_case { " --rust_case" } else { "" };
+		let no_functions = if self.no_functions { " --no_functions" } else { "" };
 		let use_tuples = if self.use_tuples == Tuples::ForOverloads {
 			String::new()
 		} else {
 			format!(" --use-tuples {}", self.use_tuples.to_str())
 		};
-		let no_functions = if self.no_functions { " --no_functions" } else { "" };
+		let third_party = if self.third_party.is_empty() {
+			String::new()
+		} else {
+			let list = self.third_party.iter().map(|v| v.to_str()).fold(String::new(), |acc, v| acc+v+",");
+			format!(" --third-party \"{}\"", &list[..(list.len()-1)])
+		};
 		format!(
-			"sql_db_mapper{ugly}{dir}{rust_case}{use_tuples}{no_functions}",
+			"sql_db_mapper{ugly}{dir}{rust_case}{no_functions}{use_tuples}{third_party}",
 			ugly = ugly,
 			dir = dir,
 			rust_case = rust_case,
-			use_tuples = use_tuples,
 			no_functions = no_functions,
+			use_tuples = use_tuples,
+			third_party = third_party,
 		)
 	}
 
