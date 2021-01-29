@@ -49,9 +49,10 @@ OPTIONS:
 ARGS:
     <output>    Output file, stdout if not present
 ```
+
 ## Common Errors
 | cannot find type \`????\` in module \`super::pg_catalog\`  
-The type specified is only mapped by one of the third party crates. `postgres_types::FromSql` lists all the types that should appear except for `Numeric` which is mapped with `rust_decimal::Decimal`
+The type specified is only mapped by one of the third party crates. `postgres_types::FromSql` lists all the types that can be mapped except for `Numeric` which is mapped with `rust_decimal::Decimal`
 
 ---
 
@@ -64,19 +65,78 @@ Features a derive macro from TryFromRow (defined in sql_db_mapper_core)
 
 ---
 
+## Use in a `build.rs` script
+Make a new library crate and make your Cargo.toml look like the following
+```toml
+[package]
+name = "rust_test"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+sql_db_mapper_core = { version = "0.1", features = ["with-bit-vec-0_6", "with-chrono-0_4", "with-eui48-0_4", "with-geo-types-0_6", "with-rust_decimal-1", "with-serde_json-1", "with-time-0_2", "with-uuid-0_8", ] }
+postgres-types = { version = "0.2", features = ["derive"] }
+async-trait = { version = "0.1", optional = true }
+
+serde = { version = "1.0", features = ["derive"] }
+
+[build-dependencies]
+sql_db_mapper = { path = "../sql_db_mapper/sql_db_mapper" }
+
+[features]
+sync = []
+async = ["async-trait"]
+```
+Change the name and version of the crate as well as the features for `sql_db_mapper_core` to your liking
+
+Create a `build.rs` file with the following contents
+```rust
+use sql_db_mapper::{ Opt, Tuples, ThirdParty };
+
+fn main() {
+	let options = Opt {
+		debug: false,
+		ugly: false,
+		dir: false, // this should be false
+		rust_case: true,
+		rustfmt_config: None,
+		rustfmt_config_path: None,
+		no_functions: false,
+		use_tuples: Tuples::ForOverloads,
+		third_party: vec![
+			ThirdParty::Chrono,
+			ThirdParty::Time,
+			ThirdParty::Eui48,
+			ThirdParty::GeoTypes,
+			ThirdParty::SerdeJson,
+			ThirdParty::Uuid,
+			ThirdParty::BitVec,
+			ThirdParty::RustDecimal,
+		],
+		conn: std::env::var("DATABASE_URL").expect("Must provide connection string in environment variable 'DATABASE_URL'"),
+		output: Some("./src/lib.rs".into())
+	};
+
+	let mut client = options.get_client();
+	let full_db = client.get_all(options.no_functions);
+
+	full_db.make_output(&options);
+}
+```
+That should be enough to get started.
+
+---
+
 ### Possible Future Work
 * more options relating to how the code is generated
 	* Grab text from `COMMENT ON` and stick it in doc comments
 	* Allow functions that take (for example) an &varchar to take an &str (varchar is a typedef of String so functions would need to be generic like HashMap's get most likely)
 * consider adding support for other popular databases as well or rust database libraries
-	* either through connecting to the database as is being currently done or possibly by parsing SQL itself
     * sqlx and diesel code generators would be useful
-* Add option for use of TLS connection
 
 ---
 
 ## License
-
 Licensed under either of
 
  * Apache License, Version 2.0
@@ -87,7 +147,6 @@ Licensed under either of
 at your option.
 
 ## Contribution
-
 Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
 dual licensed as above, without any additional terms or conditions.
