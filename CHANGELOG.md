@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 Nothing yet
 
+## 0.1.1 2021-01-29
+### Changed
+- Quick fix for documentation in derive and core
+
 ## 0.1.0 - 2021-01-29
 This is a major overhaul so only some changes are specifically mentioned
 ### Added
