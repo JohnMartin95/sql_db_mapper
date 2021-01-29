@@ -206,7 +206,7 @@ impl FullDB {
 
 	/// builds the contents of the async_fns module
 	pub fn async_content(&self, opt: &Opt) -> TokenStream {
-		let schemas = self.schemas.iter().map(|v| v.get_funcs_module(opt, true));
+		let schemas = self.schemas.iter().map(|v| v.get_funcs_module(opt, false));
 
 		quote! {
 			pub use super::orm::{
@@ -304,7 +304,9 @@ impl Schema {
 	///gets the content for this schema as it would appears in the `sync_fns` and `async_fns` module
 	fn get_funcs_module(&self, opt: &Opt, is_sync: bool) -> TokenStream {
 		let name = format_heck(&self.name, opt, SnakeCase);
-		if opt.dir {
+		if self.no_procs() {
+			quote! {}
+		} else if opt.dir {
 			quote! { pub mod #name; }
 		} else {
 			let content = self.funcs_content(opt, is_sync);
