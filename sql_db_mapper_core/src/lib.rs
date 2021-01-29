@@ -5,8 +5,8 @@
 //!
 //! Reexports [`tokio_postgres::Error`] as SqlError (the Result::Err of the return from [`TryFromRow::from_row`]) and [`tokio_postgres::Row`]
 //!
-//! [`tokio_postgres::Error`]: https://docs.rs/tokio-postgres/0.6/tokio_postgres/error/struct.Error.html
-//! [`tokio_postgres::Row`]: https://docs.rs/tokio-postgres/0.6/tokio_postgres/row/struct.Row.html
+//! [`tokio_postgres::Error`]: https://docs.rs/tokio-postgres/0.7/tokio_postgres/error/struct.Error.html
+//! [`tokio_postgres::Row`]: https://docs.rs/tokio-postgres/0.7/tokio_postgres/row/struct.Row.html
 //! [`TryFromRow::from_row`]: ./trait.TryFromRow.html#tymethod.from_row
 //! [`TryFromRow`]: ./trait.TryFromRow.html
 //! [`Interval`]: ./struct.Interval.html
